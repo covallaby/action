@@ -45,3 +45,12 @@ jobs:
           files: coverage/lcov.info
           min-project: 75
           min-patch: 80
+
+      - name: HTML report
+        run: node packages/cli/dist/bin.js html coverage/lcov.info --strip-prefix "$PWD" -o covallaby-report
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: covallaby-report
+          path: covallaby-report

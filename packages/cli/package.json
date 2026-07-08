@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@covallaby/core": "workspace:*",
+    "@covallaby/html-report": "workspace:*",
     "@covallaby/parsers": "workspace:*",
     "commander": "^12.1.0",
     "picocolors": "^1.1.1"

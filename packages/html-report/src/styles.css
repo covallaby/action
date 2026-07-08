@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Role tokens (light), from the validated reference palette. */
+:root {
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+  --hairline: #e1e0d9;
+  --border: rgba(11, 11, 11, 0.1);
+
+  --status-good: #0ca30c;
+  --status-good-track: #d9efd9;
+  --status-warning: #fab219;
+  --status-warning-track: #fdeecb;
+  --status-serious: #ec835a;
+  --status-serious-track: #fbe3d9;
+  --status-critical: #d03b3b;
+  --status-critical-track: #f5d4d4;
+
+  --line-uncovered: rgba(208, 59, 59, 0.1);
+  --line-covered-gutter: #d9efd9;
+  --line-changed: rgba(42, 120, 214, 0.12);
+}
+
+.dark {
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+  --hairline: #2c2c2a;
+  --border: rgba(255, 255, 255, 0.1);
+
+  --status-good-track: #14330f;
+  --status-warning-track: #3a2c07;
+  --status-serious-track: #3d1f12;
+  --status-critical-track: #3a1414;
+
+  --line-uncovered: rgba(208, 59, 59, 0.16);
+  --line-covered-gutter: #14330f;
+  --line-changed: rgba(57, 135, 229, 0.16);
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+code,
+pre,
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

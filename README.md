@@ -26,7 +26,7 @@ Early days — the CLI works today; the GitHub Action is next.
 - ✅ **Milestone 1** — workspace, CI, linting, tests
 - ✅ **Milestone 2** — coverage model, LCOV parser, CLI
 - ✅ **Milestone 3** — GitHub Action: sticky PR comments, patch coverage, thresholds, Step Summary
-- 🔜 **Milestone 4** — static HTML report
+- ✅ **Milestone 4** — static HTML report: one self-contained file, dark mode, searchable
 - 🔜 **Milestone 5** — JaCoCo, Cobertura, and xccov parsers
 
 ## CLI
@@ -37,6 +37,9 @@ covallaby report coverage/lcov.info
 
 # Gate CI on a threshold — failures explain what to do next, never just "failed"
 covallaby check coverage/lcov.info --min-project 85
+
+# Generate a beautiful static HTML report — one file, no server, dark mode
+covallaby html coverage/lcov.info -o covallaby-report
 
 # Sanity-check that a coverage file parses
 covallaby validate coverage/lcov.info
@@ -88,6 +91,8 @@ The repo is a pnpm workspace:
 | `@covallaby/core` | The shared coverage model, summaries, thresholds, badge |
 | `@covallaby/parsers` | Format parsers that normalize into the model |
 | `covallaby` | The CLI |
+| `@covallaby/html-report` | The static HTML report template (React + Tailwind, single file) |
+| `@covallaby/github-action` | The Action |
 
 Design decisions live in [`docs/design/`](docs/design/). Product and brand
 guidance live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and [`docs/BRAND.md`](docs/BRAND.md).

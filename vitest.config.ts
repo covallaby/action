@@ -20,7 +20,13 @@ export default defineConfig({
       provider: "v8",
       reporter: ["lcov", "text-summary"],
       include: ["packages/*/src/**"],
-      exclude: ["**/*.test.ts", "packages/github-action/src/entry.ts", "packages/cli/src/bin.ts"],
+      exclude: [
+        "**/*.test.ts",
+        "packages/github-action/src/entry.ts",
+        "packages/cli/src/bin.ts",
+        // Browser-only UI; vitest never executes it. Verified by rendering.
+        "packages/html-report/src/**",
+      ],
     },
   },
 });

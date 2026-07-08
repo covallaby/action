@@ -1,8 +1,16 @@
-import { writeFileSync } from "node:fs";
-import { checkThresholds, formatPercent, renderBadge, summarize } from "@covallaby/core";
+import { readFileSync, writeFileSync } from "node:fs";
+import {
+  type ChangedFile,
+  checkThresholds,
+  formatPercent,
+  parseUnifiedDiff,
+  renderBadge,
+  summarize,
+} from "@covallaby/core";
 import { type CoverageFormat, ParseError, detectFormat } from "@covallaby/parsers";
 import { Command } from "commander";
 import pc from "picocolors";
+import { writeHtmlReport } from "./html.js";
 import { loadReports } from "./load.js";
 import { renderReport, reportJson } from "./render.js";
 
@@ -104,6 +112,48 @@ export function buildProgram(): Command {
       process.stdout.write(svg);
     }
   });
+
+  addCommonOptions(
+    program
+      .command("html")
+      .description("Generate a beautiful static HTML report — one self-contained file")
+      .argument("<files...>", "coverage files")
+      .option("-o, --output <dir>", "output directory", "covallaby-report")
+      .option("--source-root <dir>", "where to read source files from", ".")
+      .option("--diff <patch>", "unified diff file; adds patch coverage and the Diff view")
+      .option("--template <path>", "override the report template (mainly for tests)"),
+  ).action(
+    (
+      files: string[],
+      opts: CommonOptions & {
+        output: string;
+        sourceRoot: string;
+        diff?: string;
+        template?: string;
+      },
+    ) => {
+      const report = loadReports(files, loadOptions(opts));
+      let patch: ChangedFile[] | undefined;
+      if (opts.diff) {
+        patch = parseUnifiedDiff(readFileSync(opts.diff, "utf8"));
+      }
+      const outFile = writeHtmlReport({
+        report,
+        outDir: opts.output,
+        version: program.version() ?? "0.0.0",
+        sourceRoot: opts.sourceRoot,
+        ...(patch && { patch }),
+        ...(opts.template !== undefined && { templatePath: opts.template }),
+      });
+      const summary = summarize(report);
+      console.log(
+        pc.green(`✓ Report written to ${outFile}`) +
+          pc.dim(
+            ` — ${summary.totalFiles} files at ${formatPercent(summary.lines.percent)}. Open it in a browser, no server needed.`,
+          ),
+      );
+    },
+  );
 
   addCommonOptions(
     program
