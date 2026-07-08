@@ -33,4 +33,15 @@ jobs:
         run: pnpm typecheck
 
       - name: Test
-        run: pnpm test
+        run: pnpm test:coverage
+
+      - name: Action bundle is up to date
+        run: git diff --exit-code packages/github-action/dist
+
+      # Dogfood: Covallaby reports on Covallaby.
+      - name: Coverage report
+        uses: ./packages/github-action
+        with:
+          files: coverage/lcov.info
+          min-project: 75
+          min-patch: 80

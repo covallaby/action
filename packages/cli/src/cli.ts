@@ -81,7 +81,7 @@ export function buildProgram(): Command {
       );
     } else {
       for (const failure of result.failures) {
-        console.error(pc.red(`✗ ${failure.message}`));
+        console.error(pc.red(`✗ ${[failure.message, failure.hint].filter(Boolean).join(" ")}`));
       }
     }
     if (!result.ok) process.exitCode = 1;

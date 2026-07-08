@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# GitHub Actions run from the repo, so the Action bundle is committed.
+!packages/github-action/dist/
 coverage/
 *.log
 .DS_Store

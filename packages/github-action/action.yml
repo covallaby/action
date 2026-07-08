@@ -1,0 +1,48 @@
+name: Covallaby
+description: Beautiful coverage reports for your pull requests.
+author: Covallaby
+branding:
+  icon: check-circle
+  color: green
+
+inputs:
+  files:
+    description: Coverage files, newline- or comma-separated (e.g. coverage/lcov.info). Merged if several.
+    required: true
+  format:
+    description: "Coverage format (default: auto-detect). Supported: lcov."
+    required: false
+  strip-prefix:
+    description: Path prefix to strip so file paths are repo-relative. Defaults to the workspace directory.
+    required: false
+  min-project:
+    description: Minimum project line coverage percent (0-100).
+    required: false
+  min-patch:
+    description: Minimum coverage percent of the lines changed in this PR (0-100).
+    required: false
+  min-new-file:
+    description: Minimum coverage percent for each file added in this PR (0-100).
+    required: false
+  comment:
+    description: "'update' (default) posts and updates one sticky PR comment; 'off' disables commenting."
+    required: false
+    default: update
+  github-token:
+    description: Token used to read the PR diff and post the sticky comment.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  project-coverage:
+    description: Project line coverage percent (one decimal), or empty if no coverable lines.
+  patch-coverage:
+    description: Patch line coverage percent (one decimal), or empty outside PRs / for docs-only changes.
+  uncovered-lines:
+    description: Number of uncovered lines in the project.
+  ok:
+    description: "'true' when every configured threshold passed."
+
+runs:
+  using: node20
+  main: dist/index.cjs

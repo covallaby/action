@@ -1,0 +1,21 @@
+{
+  "name": "@covallaby/github-action",
+  "version": "0.1.0",
+  "description": "The Covallaby GitHub Action: sticky PR comments, thresholds, and Step Summaries.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/entry.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/index.cjs --log-level=warning",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0",
+    "@covallaby/core": "workspace:*",
+    "@covallaby/parsers": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
+  }
+}

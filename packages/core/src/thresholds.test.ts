@@ -41,10 +41,47 @@ describe("checkThresholds", () => {
     expect(failure.required).toBe(85);
     expect(failure.message).toContain("60.0%");
     expect(failure.message).toContain("85.0%");
-    expect(failure.message).toContain("src/a.ts");
+    expect(failure.hint).toContain("src/a.ts");
   });
 
   it("passes when no thresholds are configured", () => {
     expect(checkThresholds(summarize(reportWithCoverage(0)), {}).ok).toBe(true);
+  });
+});
+
+describe("checkThresholds with patch coverage", () => {
+  const summary = summarize(reportWithCoverage(10));
+  const patch = (percentCovered: number, added = false) => ({
+    lines: { covered: percentCovered, total: 100, percent: percentCovered },
+    files: [
+      {
+        path: "src/a.ts",
+        added,
+        lines: { covered: percentCovered, total: 100, percent: percentCovered },
+        uncovered: [[7, 9]] as Array<[number, number]>,
+      },
+    ],
+  });
+
+  it("fails patch threshold with the uncovered spots", () => {
+    const result = checkThresholds(summary, { minPatch: 85 }, patch(60));
+    expect(result.ok).toBe(false);
+    const failure = result.failures[0]!;
+    expect(failure.kind).toBe("patch");
+    expect(failure.hint).toContain("src/a.ts:7-9");
+    expect(failure.message).toContain("40 changed lines aren't covered yet");
+  });
+
+  it("treats a docs-only patch (no coverable lines) as a pass", () => {
+    const empty = { lines: { covered: 0, total: 0, percent: null }, files: [] };
+    expect(checkThresholds(summary, { minPatch: 85 }, empty).ok).toBe(true);
+  });
+
+  it("gates each added file with min-new-file", () => {
+    const result = checkThresholds(summary, { minNewFile: 90 }, patch(60, true));
+    expect(result.failures.map((f) => f.kind)).toEqual(["new-file"]);
+    expect(result.failures[0]!.message).toContain("New file src/a.ts");
+    // existing files are exempt
+    expect(checkThresholds(summary, { minNewFile: 90 }, patch(60, false)).ok).toBe(true);
   });
 });

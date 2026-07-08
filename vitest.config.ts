@@ -13,5 +13,11 @@ export default defineConfig({
   },
   test: {
     include: ["packages/*/src/**/*.test.ts", "packages/*/test/**/*.test.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["lcov", "text-summary"],
+      include: ["packages/*/src/**"],
+      exclude: ["**/*.test.ts", "packages/github-action/src/entry.ts", "packages/cli/src/bin.ts"],
+    },
   },
 });

@@ -1,16 +1,23 @@
-import type { ReportSummary } from "./model.js";
+import type { PatchSummary } from "./diff.js";
+import { type ReportSummary, formatRanges } from "./model.js";
 
 export interface Thresholds {
   /** Minimum project line coverage percent (0–100). */
   minProject?: number;
+  /** Minimum coverage percent of the lines changed in the PR. */
+  minPatch?: number;
+  /** Minimum coverage percent for each file added in the PR. */
+  minNewFile?: number;
 }
 
 export interface ThresholdFailure {
-  kind: "project";
+  kind: "project" | "patch" | "new-file";
   actual: number | null;
   required: number;
-  /** A friendly, actionable explanation — never just "coverage failed". */
+  /** A friendly, factual explanation — never just "coverage failed". */
   message: string;
+  /** Where to start fixing it. Shown in logs; comments show their own list. */
+  hint?: string;
 }
 
 export interface CheckResult {
@@ -25,10 +32,14 @@ export function formatPercent(value: number | null): string {
 }
 
 /**
- * Evaluate thresholds against a summary. Patch and new-file thresholds
- * arrive with diff support in Milestone 3.
+ * Evaluate thresholds. `patch` is required for the patch/new-file gates and
+ * comes from computePatchCoverage (Action or `covallaby compare`).
  */
-export function checkThresholds(summary: ReportSummary, thresholds: Thresholds): CheckResult {
+export function checkThresholds(
+  summary: ReportSummary,
+  thresholds: Thresholds,
+  patch?: PatchSummary,
+): CheckResult {
   const failures: ThresholdFailure[] = [];
 
   if (thresholds.minProject !== undefined) {
@@ -49,9 +60,46 @@ export function checkThresholds(summary: ReportSummary, thresholds: Thresholds):
         required: thresholds.minProject,
         message:
           actual === null
-            ? `Project coverage is required to be ${formatPercent(thresholds.minProject)}, but the report contains no coverable lines. ${hint}`
-            : `Project coverage is ${formatPercent(actual)}, but ${formatPercent(thresholds.minProject)} is required (${formatPercent(gap)} to go). ${hint}`,
+            ? `Project coverage is required to be ${formatPercent(thresholds.minProject)}, but the report contains no coverable lines.`
+            : `Project coverage is ${formatPercent(actual)}, but ${formatPercent(thresholds.minProject)} is required (${formatPercent(gap)} to go).`,
+        hint,
       });
+    }
+  }
+
+  if (thresholds.minPatch !== undefined && patch) {
+    const actual = patch.lines.percent;
+    // No coverable changed lines (docs-only PR, config, …) is a pass, not a fail.
+    if (actual !== null && actual < thresholds.minPatch) {
+      const spots = patch.files
+        .filter((f) => f.uncovered.length > 0)
+        .slice(0, 3)
+        .map((f) => `${f.path}:${formatRanges(f.uncovered)}`);
+      const missing = patch.lines.total - patch.lines.covered;
+      const notCovered = `${missing} changed ${missing === 1 ? "line isn't" : "lines aren't"} covered yet`;
+      failures.push({
+        kind: "patch",
+        actual,
+        required: thresholds.minPatch,
+        message: `Patch coverage is ${formatPercent(actual)}, but ${formatPercent(thresholds.minPatch)} is required. ${notCovered}.`,
+        ...(spots.length > 0 && { hint: `Start with ${spots.join(", ")}.` }),
+      });
+    }
+  }
+
+  if (thresholds.minNewFile !== undefined && patch) {
+    for (const file of patch.files) {
+      if (!file.added) continue;
+      const actual = file.lines.percent;
+      if (actual !== null && actual < thresholds.minNewFile) {
+        failures.push({
+          kind: "new-file",
+          actual,
+          required: thresholds.minNewFile,
+          message: `New file ${file.path} is ${formatPercent(actual)} covered, but new files need ${formatPercent(thresholds.minNewFile)}.`,
+          hint: `Uncovered lines: ${formatRanges(file.uncovered)}.`,
+        });
+      }
     }
   }
 

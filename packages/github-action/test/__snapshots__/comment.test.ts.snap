@@ -1,0 +1,24 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderComment > renders a failing report with things to look at 1`] = `
+"<!-- covallaby-report:v1 -->
+
+## 🦘 Covallaby
+
+One thing to look at before merging.
+
+| Metric | Result |
+|---|---|
+| Project coverage | 42.8% |
+| Patch coverage | 20.0% |
+| Required | patch 85.0% |
+
+> ⚠️ Patch coverage is 20.0%, but 85.0% is required. 4 changed lines aren't covered yet.
+
+4 changed lines need some love:
+
+- \`src/payment.ts:42, 44-45\`
+- \`src/checkout.ts:88\`
+
+<sub>3 of 7 lines covered across 2 files · [Covallaby](https://github.com/covallaby/covallaby)</sub>"
+`;
