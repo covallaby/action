@@ -112,6 +112,7 @@ export async function run(): Promise<void> {
       patch,
       thresholds: inputs.thresholds,
       result,
+      breakdown: inputs.breakdown,
     };
 
     core.setOutput("project-coverage", formatPercent(summary.lines.percent).replace("%", ""));

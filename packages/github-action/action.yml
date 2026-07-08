@@ -32,6 +32,10 @@ inputs:
     description: "Create a rich 'Covallaby' entry in the Checks tab with the full report and annotations (needs the `checks: write` permission). Default true."
     required: false
     default: "true"
+  breakdown:
+    description: "Directory rollup in the report: 'auto' (default, picks a depth that stays readable), a fixed depth number, or 'off'."
+    required: false
+    default: auto
   annotations:
     description: "Annotate uncovered changed lines in the PR diff (max 10). Default true."
     required: false

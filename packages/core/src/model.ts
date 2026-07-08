@@ -193,12 +193,51 @@ function mergeInto(target: FileCoverage, source: FileCoverage): void {
   target.branches.sort((a, b) => a.line - b.line);
 }
 
+export interface RollupOptions {
+  /**
+   * Path depth to group at; "auto" (default) picks the deepest depth that
+   * still fits within maxRows groups, so small repos get full detail and
+   * monorepos roll up to their top-level packages.
+   */
+  depth?: number | "auto";
+  /** Group budget for "auto" (default 20). */
+  maxRows?: number;
+}
+
+function dirAtDepth(path: string, depth: number): string {
+  const parts = path.split("/");
+  parts.pop(); // drop the file name
+  if (parts.length === 0) return ".";
+  return parts.slice(0, depth).join("/");
+}
+
 /**
- * Roll file summaries up to their directory (the path's dirname), for
- * compact by-module breakdowns. Root-level files group under ".".
- * Sorted lowest coverage first — what needs attention leads.
+ * Roll file summaries up to directories for compact by-module breakdowns.
+ * Root-level files group under ".". Sorted lowest coverage first — what
+ * needs attention leads.
  */
-export function rollupByDirectory(summary: ReportSummary): FileSummary[] {
+export function rollupByDirectory(
+  summary: ReportSummary,
+  options: RollupOptions = {},
+): FileSummary[] {
+  const maxRows = options.maxRows ?? 20;
+  const maxDepth = Math.max(1, ...summary.files.map((f) => f.path.split("/").length - 1));
+
+  let depth: number;
+  if (options.depth !== undefined && options.depth !== "auto") {
+    depth = Math.max(1, options.depth);
+  } else {
+    // Deepest depth whose group count still fits the row budget.
+    depth = 1;
+    for (let d = maxDepth; d >= 1; d--) {
+      const count = new Set(summary.files.map((f) => dirAtDepth(f.path, d))).size;
+      if (count <= maxRows) {
+        depth = d;
+        break;
+      }
+    }
+  }
+
   interface Tally {
     lines: [number, number];
     functions: [number, number];
@@ -206,8 +245,7 @@ export function rollupByDirectory(summary: ReportSummary): FileSummary[] {
   }
   const byDir = new Map<string, Tally>();
   for (const file of summary.files) {
-    const slash = file.path.lastIndexOf("/");
-    const dir = slash === -1 ? "." : file.path.slice(0, slash);
+    const dir = dirAtDepth(file.path, depth);
     const entry = byDir.get(dir) ?? { lines: [0, 0], functions: [0, 0], branches: [0, 0] };
     byDir.set(dir, entry);
     entry.lines[0] += file.lines.covered;

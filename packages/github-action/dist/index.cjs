@@ -26076,11 +26076,32 @@ function mergeInto(target, source) {
   }
   target.branches.sort((a, b) => a.line - b.line);
 }
-function rollupByDirectory(summary2) {
+function dirAtDepth(path, depth) {
+  const parts = path.split("/");
+  parts.pop();
+  if (parts.length === 0)
+    return ".";
+  return parts.slice(0, depth).join("/");
+}
+function rollupByDirectory(summary2, options = {}) {
+  const maxRows = options.maxRows ?? 20;
+  const maxDepth = Math.max(1, ...summary2.files.map((f) => f.path.split("/").length - 1));
+  let depth;
+  if (options.depth !== void 0 && options.depth !== "auto") {
+    depth = Math.max(1, options.depth);
+  } else {
+    depth = 1;
+    for (let d = maxDepth; d >= 1; d--) {
+      const count = new Set(summary2.files.map((f) => dirAtDepth(f.path, d))).size;
+      if (count <= maxRows) {
+        depth = d;
+        break;
+      }
+    }
+  }
   const byDir = /* @__PURE__ */ new Map();
   for (const file of summary2.files) {
-    const slash = file.path.lastIndexOf("/");
-    const dir = slash === -1 ? "." : file.path.slice(0, slash);
+    const dir = dirAtDepth(file.path, depth);
     const entry = byDir.get(dir) ?? { lines: [0, 0], functions: [0, 0], branches: [0, 0] };
     byDir.set(dir, entry);
     entry.lines[0] += file.lines.covered;
@@ -26646,6 +26667,8 @@ function buildAnnotations(patch, cap = ANNOTATION_CAP) {
 
 // src/comment.ts
 var COMMENT_MARKER = "<!-- covallaby-report:v1 -->";
+var COMMENT_ROWS = 20;
+var REPORT_PAGE_ROWS = 200;
 function headline({ result, patch, summary: summary2 }) {
   if (!result.ok) {
     const n = result.failures.length;
@@ -26655,7 +26678,7 @@ function headline({ result, patch, summary: summary2 }) {
   if (summary2.lines.percent === 100) return "You're covered \u2014 the whole project is at 100%.";
   return "You're covered.";
 }
-function renderComment(input) {
+function renderComment(input, maxRows = COMMENT_ROWS) {
   const { summary: summary2, patch, thresholds, result } = input;
   const lines = [COMMENT_MARKER, "", "## \u{1F998} Covallaby", "", headline(input), ""];
   lines.push("| Metric | Result |");
@@ -26700,14 +26723,13 @@ function renderComment(input) {
     lines.push("Nice jump! Every changed line that can be tested, is. \u{1F389}");
     lines.push("");
   }
-  lines.push(...renderBreakdown(summary2, patch));
+  lines.push(...renderBreakdown(summary2, patch, input.breakdown ?? "auto", maxRows));
   lines.push(
     `<sub>${summary2.lines.covered} of ${summary2.lines.total} lines covered across ${summary2.totalFiles} files \xB7 [Covallaby](https://github.com/covallaby/covallaby)</sub>`
   );
   return lines.join("\n");
 }
-var BREAKDOWN_ROWS = 20;
-function renderBreakdown(summary2, patch) {
+function renderBreakdown(summary2, patch, breakdown, maxRows) {
   const lines = [];
   const changed = (patch?.files ?? []).filter((f) => f.lines.total > 0);
   if (changed.length > 0) {
@@ -26717,31 +26739,35 @@ function renderBreakdown(summary2, patch) {
     lines.push("");
     lines.push("| File | Patch | Missing |");
     lines.push("|---|---|---|");
-    for (const f of rows.slice(0, BREAKDOWN_ROWS)) {
+    for (const f of rows.slice(0, maxRows)) {
       const missing = f.uncovered.length > 0 ? `\`${formatRanges(f.uncovered)}\`` : "\u2014";
       lines.push(`| \`${f.path}\` | ${formatPercent(f.lines.percent)} | ${missing} |`);
     }
-    if (rows.length > BREAKDOWN_ROWS) {
-      lines.push(`| \u2026and ${rows.length - BREAKDOWN_ROWS} more | | |`);
+    if (rows.length > maxRows) {
+      lines.push(`| \u2026and ${rows.length - maxRows} more | | |`);
     }
     lines.push("");
     lines.push("</details>");
     lines.push("");
   }
-  const dirs = rollupByDirectory(summary2);
+  if (breakdown === "off") return lines;
+  const dirs = rollupByDirectory(summary2, {
+    maxRows,
+    ...breakdown !== "auto" && { depth: breakdown }
+  });
   if (dirs.length > 1) {
     lines.push("<details>");
     lines.push(`<summary>Project by directory (${dirs.length})</summary>`);
     lines.push("");
     lines.push("| Directory | Lines | Coverage |");
     lines.push("|---|---|---|");
-    for (const d of dirs.slice(0, BREAKDOWN_ROWS)) {
+    for (const d of dirs.slice(0, maxRows)) {
       lines.push(
         `| \`${d.path}/\` | ${d.lines.covered}/${d.lines.total} | ${formatPercent(d.lines.percent)} |`
       );
     }
-    if (dirs.length > BREAKDOWN_ROWS) {
-      lines.push(`| \u2026and ${dirs.length - BREAKDOWN_ROWS} more | | |`);
+    if (dirs.length > maxRows) {
+      lines.push(`| \u2026and ${dirs.length - maxRows} more | | |`);
     }
     lines.push("");
     lines.push("</details>");
@@ -26750,7 +26776,7 @@ function renderBreakdown(summary2, patch) {
   return lines;
 }
 function renderStepSummary(input) {
-  return renderComment(input).replace(`${COMMENT_MARKER}
+  return renderComment(input, REPORT_PAGE_ROWS).replace(`${COMMENT_MARKER}
 
 `, "");
 }
@@ -26762,6 +26788,14 @@ function parseSwitch(raw, name, fallback) {
   if (value === "true" || value === "on") return true;
   if (value === "false" || value === "off") return false;
   throw new Error(`\`${name}\` must be "true" or "false", got "${raw}".`);
+}
+function parseBreakdown(raw) {
+  const value = raw.trim().toLowerCase();
+  if (value === "" || value === "auto") return "auto";
+  if (value === "off") return "off";
+  const depth = Number(value);
+  if (Number.isInteger(depth) && depth >= 1) return depth;
+  throw new Error(`\`breakdown\` must be "auto", "off", or a directory depth (1+), got "${raw}".`);
 }
 function parsePercent(raw, name) {
   if (raw === "") return void 0;
@@ -26802,6 +26836,7 @@ function parseInputs(raw, workspace) {
     thresholds,
     comment,
     check: parseSwitch(raw.getInput("check"), "check", true),
+    breakdown: parseBreakdown(raw.getInput("breakdown")),
     annotations: parseSwitch(raw.getInput("annotations"), "annotations", true),
     statuses: parseSwitch(raw.getInput("statuses"), "statuses", true),
     githubToken: raw.getInput("github-token")
@@ -26887,7 +26922,8 @@ async function run() {
       summary: summary2,
       patch,
       thresholds: inputs.thresholds,
-      result
+      result,
+      breakdown: inputs.breakdown
     };
     core.setOutput("project-coverage", formatPercent(summary2.lines.percent).replace("%", ""));
     core.setOutput(

@@ -27,6 +27,7 @@ describe("action.yml", () => {
       "min-new-file",
       "comment",
       "check",
+      "breakdown",
       "annotations",
       "statuses",
       "github-token",

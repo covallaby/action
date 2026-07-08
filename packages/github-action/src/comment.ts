@@ -15,7 +15,17 @@ export interface CommentInput {
   patch: PatchSummary | null;
   thresholds: Thresholds;
   result: CheckResult;
+  /** Directory-rollup depth: "auto" (default), a number, or "off". */
+  breakdown?: number | "auto" | "off";
 }
+
+/**
+ * Row budgets differ by surface: a PR comment lives in the conversation and
+ * must stay compact; the Step Summary and check-run page are dedicated
+ * report pages with room for the full table.
+ */
+const COMMENT_ROWS = 20;
+const REPORT_PAGE_ROWS = 200;
 
 function headline({ result, patch, summary }: CommentInput): string {
   if (!result.ok) {
@@ -28,7 +38,7 @@ function headline({ result, patch, summary }: CommentInput): string {
 }
 
 /** The sticky PR comment. One table, plain words, no dashboards. */
-export function renderComment(input: CommentInput): string {
+export function renderComment(input: CommentInput, maxRows: number = COMMENT_ROWS): string {
   const { summary, patch, thresholds, result } = input;
   const lines: string[] = [COMMENT_MARKER, "", "## 🦘 Covallaby", "", headline(input), ""];
 
@@ -77,7 +87,7 @@ export function renderComment(input: CommentInput): string {
     lines.push("");
   }
 
-  lines.push(...renderBreakdown(summary, patch));
+  lines.push(...renderBreakdown(summary, patch, input.breakdown ?? "auto", maxRows));
 
   lines.push(
     `<sub>${summary.lines.covered} of ${summary.lines.total} lines covered across ${summary.totalFiles} files · [Covallaby](https://github.com/covallaby/covallaby)</sub>`,
@@ -85,10 +95,13 @@ export function renderComment(input: CommentInput): string {
   return lines.join("\n");
 }
 
-const BREAKDOWN_ROWS = 20;
-
 /** Collapsed-by-default per-file and per-directory tables. */
-function renderBreakdown(summary: ReportSummary, patch: PatchSummary | null): string[] {
+function renderBreakdown(
+  summary: ReportSummary,
+  patch: PatchSummary | null,
+  breakdown: number | "auto" | "off",
+  maxRows: number,
+): string[] {
   const lines: string[] = [];
 
   const changed = (patch?.files ?? []).filter((f) => f.lines.total > 0);
@@ -99,32 +112,37 @@ function renderBreakdown(summary: ReportSummary, patch: PatchSummary | null): st
     lines.push("");
     lines.push("| File | Patch | Missing |");
     lines.push("|---|---|---|");
-    for (const f of rows.slice(0, BREAKDOWN_ROWS)) {
+    for (const f of rows.slice(0, maxRows)) {
       const missing = f.uncovered.length > 0 ? `\`${formatRanges(f.uncovered)}\`` : "—";
       lines.push(`| \`${f.path}\` | ${formatPercent(f.lines.percent)} | ${missing} |`);
     }
-    if (rows.length > BREAKDOWN_ROWS) {
-      lines.push(`| …and ${rows.length - BREAKDOWN_ROWS} more | | |`);
+    if (rows.length > maxRows) {
+      lines.push(`| …and ${rows.length - maxRows} more | | |`);
     }
     lines.push("");
     lines.push("</details>");
     lines.push("");
   }
 
-  const dirs = rollupByDirectory(summary);
+  if (breakdown === "off") return lines;
+
+  const dirs = rollupByDirectory(summary, {
+    maxRows,
+    ...(breakdown !== "auto" && { depth: breakdown }),
+  });
   if (dirs.length > 1) {
     lines.push("<details>");
     lines.push(`<summary>Project by directory (${dirs.length})</summary>`);
     lines.push("");
     lines.push("| Directory | Lines | Coverage |");
     lines.push("|---|---|---|");
-    for (const d of dirs.slice(0, BREAKDOWN_ROWS)) {
+    for (const d of dirs.slice(0, maxRows)) {
       lines.push(
         `| \`${d.path}/\` | ${d.lines.covered}/${d.lines.total} | ${formatPercent(d.lines.percent)} |`,
       );
     }
-    if (dirs.length > BREAKDOWN_ROWS) {
-      lines.push(`| …and ${dirs.length - BREAKDOWN_ROWS} more | | |`);
+    if (dirs.length > maxRows) {
+      lines.push(`| …and ${dirs.length - maxRows} more | | |`);
     }
     lines.push("");
     lines.push("</details>");
@@ -134,7 +152,7 @@ function renderBreakdown(summary: ReportSummary, patch: PatchSummary | null): st
   return lines;
 }
 
-/** The GitHub Step Summary — same content, no marker. */
+/** The Step Summary / check-run body — same content, no marker, full tables. */
 export function renderStepSummary(input: CommentInput): string {
-  return renderComment(input).replace(`${COMMENT_MARKER}\n\n`, "");
+  return renderComment(input, REPORT_PAGE_ROWS).replace(`${COMMENT_MARKER}\n\n`, "");
 }

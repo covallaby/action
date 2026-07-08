@@ -9,6 +9,7 @@ export interface ActionInputs {
   comment: "update" | "off";
   check: boolean;
   annotations: boolean;
+  breakdown: number | "auto" | "off";
   statuses: boolean;
   githubToken: string;
 }
@@ -23,6 +24,15 @@ function parseSwitch(raw: string, name: string, fallback: boolean): boolean {
   if (value === "true" || value === "on") return true;
   if (value === "false" || value === "off") return false;
   throw new Error(`\`${name}\` must be "true" or "false", got "${raw}".`);
+}
+
+function parseBreakdown(raw: string): number | "auto" | "off" {
+  const value = raw.trim().toLowerCase();
+  if (value === "" || value === "auto") return "auto";
+  if (value === "off") return "off";
+  const depth = Number(value);
+  if (Number.isInteger(depth) && depth >= 1) return depth;
+  throw new Error(`\`breakdown\` must be "auto", "off", or a directory depth (1+), got "${raw}".`);
 }
 
 function parsePercent(raw: string, name: string): number | undefined {
@@ -73,6 +83,7 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
     thresholds,
     comment,
     check: parseSwitch(raw.getInput("check"), "check", true),
+    breakdown: parseBreakdown(raw.getInput("breakdown")),
     annotations: parseSwitch(raw.getInput("annotations"), "annotations", true),
     statuses: parseSwitch(raw.getInput("statuses"), "statuses", true),
     githubToken: raw.getInput("github-token"),

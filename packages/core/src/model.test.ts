@@ -110,3 +110,29 @@ describe("rollupByDirectory", () => {
     ]);
   });
 });
+
+describe("rollupByDirectory depth", () => {
+  const wideRepo = summarize({
+    files: Array.from({ length: 30 }, (_, i) => ({
+      path: `packages/pkg${i % 3}/src/feature${i}/impl.ts`,
+      lines: [{ line: 1, hits: i % 2 }],
+      functions: [],
+      branches: [],
+    })),
+  });
+
+  it("auto picks the deepest depth that fits the row budget", () => {
+    // 30 leaf dirs blow the budget; depth 3 (pkgN/src) is the deepest fit.
+    const dirs = rollupByDirectory(wideRepo);
+    expect(dirs.map((d) => d.path).sort()).toEqual([
+      "packages/pkg0/src",
+      "packages/pkg1/src",
+      "packages/pkg2/src",
+    ]);
+  });
+
+  it("honors an explicit depth", () => {
+    expect(rollupByDirectory(wideRepo, { depth: 1 }).map((d) => d.path)).toEqual(["packages"]);
+    expect(rollupByDirectory(wideRepo, { depth: 99 })).toHaveLength(30);
+  });
+});
