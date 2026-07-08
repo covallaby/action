@@ -3,6 +3,7 @@ import {
   type CoverageReport,
   formatRanges,
   mergeReports,
+  rollupByDirectory,
   summarize,
   uncoveredRanges,
 } from "./model.js";
@@ -83,6 +84,29 @@ describe("mergeReports", () => {
     expect(uncoveredRanges(payment)).toEqual([
       [3, 3],
       [9, 9],
+    ]);
+  });
+});
+
+describe("rollupByDirectory", () => {
+  it("aggregates file counters per dirname, worst first", () => {
+    const dirs = rollupByDirectory(summarize(report));
+    expect(dirs.map((d) => d.path)).toEqual(["src"]);
+    expect(dirs[0]!.lines).toEqual({ covered: 3, total: 6, percent: 50 });
+  });
+
+  it("groups root-level files under '.'", () => {
+    const rolled = rollupByDirectory(
+      summarize({
+        files: [
+          { path: "main.ts", lines: [{ line: 1, hits: 1 }], functions: [], branches: [] },
+          { path: "src/a.ts", lines: [{ line: 1, hits: 0 }], functions: [], branches: [] },
+        ],
+      }),
+    );
+    expect(rolled.map((d) => [d.path, d.lines.percent])).toEqual([
+      ["src", 0],
+      [".", 100],
     ]);
   });
 });

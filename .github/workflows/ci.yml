@@ -13,6 +13,7 @@ jobs:
       contents: read
       pull-requests: write
       statuses: write # covallaby/project + covallaby/patch named checks
+      checks: write # the rich "Covallaby" Checks-tab entry
     steps:
       - uses: actions/checkout@v4
 

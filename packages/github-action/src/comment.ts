@@ -5,6 +5,7 @@ import {
   type Thresholds,
   formatPercent,
   formatRanges,
+  rollupByDirectory,
 } from "@covallaby/core";
 
 export const COMMENT_MARKER = "<!-- covallaby-report:v1 -->";
@@ -76,10 +77,61 @@ export function renderComment(input: CommentInput): string {
     lines.push("");
   }
 
+  lines.push(...renderBreakdown(summary, patch));
+
   lines.push(
     `<sub>${summary.lines.covered} of ${summary.lines.total} lines covered across ${summary.totalFiles} files · [Covallaby](https://github.com/covallaby/covallaby)</sub>`,
   );
   return lines.join("\n");
+}
+
+const BREAKDOWN_ROWS = 20;
+
+/** Collapsed-by-default per-file and per-directory tables. */
+function renderBreakdown(summary: ReportSummary, patch: PatchSummary | null): string[] {
+  const lines: string[] = [];
+
+  const changed = (patch?.files ?? []).filter((f) => f.lines.total > 0);
+  if (changed.length > 0) {
+    const rows = [...changed].sort((a, b) => (a.lines.percent ?? 101) - (b.lines.percent ?? 101));
+    lines.push("<details>");
+    lines.push(`<summary>Changed files (${rows.length})</summary>`);
+    lines.push("");
+    lines.push("| File | Patch | Missing |");
+    lines.push("|---|---|---|");
+    for (const f of rows.slice(0, BREAKDOWN_ROWS)) {
+      const missing = f.uncovered.length > 0 ? `\`${formatRanges(f.uncovered)}\`` : "—";
+      lines.push(`| \`${f.path}\` | ${formatPercent(f.lines.percent)} | ${missing} |`);
+    }
+    if (rows.length > BREAKDOWN_ROWS) {
+      lines.push(`| …and ${rows.length - BREAKDOWN_ROWS} more | | |`);
+    }
+    lines.push("");
+    lines.push("</details>");
+    lines.push("");
+  }
+
+  const dirs = rollupByDirectory(summary);
+  if (dirs.length > 1) {
+    lines.push("<details>");
+    lines.push(`<summary>Project by directory (${dirs.length})</summary>`);
+    lines.push("");
+    lines.push("| Directory | Lines | Coverage |");
+    lines.push("|---|---|---|");
+    for (const d of dirs.slice(0, BREAKDOWN_ROWS)) {
+      lines.push(
+        `| \`${d.path}/\` | ${d.lines.covered}/${d.lines.total} | ${formatPercent(d.lines.percent)} |`,
+      );
+    }
+    if (dirs.length > BREAKDOWN_ROWS) {
+      lines.push(`| …and ${dirs.length - BREAKDOWN_ROWS} more | | |`);
+    }
+    lines.push("");
+    lines.push("</details>");
+    lines.push("");
+  }
+
+  return lines;
 }
 
 /** The GitHub Step Summary — same content, no marker. */
