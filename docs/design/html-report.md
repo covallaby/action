@@ -55,6 +55,15 @@ wears the data color.
 
 ## Rejected alternatives
 
+- **GitHub Pages as the default hosting story.** A repo has exactly one Pages
+  site, and it usually belongs to the project's docs. Recommending (or CI-ing)
+  a coverage deploy onto that slot is a land grab for a side feature. The free
+  tier's surfaces are the PR comment, the Step Summary, and the report
+  artifact; always-live hosted reports are what the optional hosted service is
+  for. Same reasoning killed committing badges/reports back to the repo:
+  generated files on main break under branch protection and race concurrent
+  pushes.
+
 - **Multi-page static site** (like istanbul's html reporter): breaks as an
   artifact — relative navigation from a zip works, but search and dark mode
   would need duplication per page, and one file is trivially portable.

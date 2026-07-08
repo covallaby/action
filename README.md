@@ -34,10 +34,10 @@ Formats are auto-detected from content: **LCOV**, **JaCoCo XML**,
 (`xcrun xccov view --archive --json Result.xcresult`).
 
 **Seeing our own coverage:** every [workflow run](../../actions) shows the
-summary on its run page and carries the full HTML report as the
-`covallaby-report` artifact. Once the repo is public, CI's Pages deploy hosts
-the live report and badge at `covallaby.github.io/covallaby` — that's when the
-README badge lands (as an image URL, not a committed file).
+summary on its run page and carries the full HTML report (plus the badge SVG)
+as the `covallaby-report` artifact. Hosted, always-live report URLs are the
+job of the future optional hosted service — a repo's single GitHub Pages slot
+belongs to its docs, and Covallaby won't squat on it.
 
 ## CLI
 
