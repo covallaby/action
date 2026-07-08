@@ -264,11 +264,33 @@ Want history, dashboards, and a live badge URL? Run the optional
 self-hosted process (built-in SQLite or your Postgres), one `curl` from CI.
 The Action never requires it.
 
+## Coverage is a floor, not a goal
+
+More coverage is not automatically better, and Covallaby will never nag you
+toward 100%. A few honest things worth saying out loud:
+
+- **Covallaby measures whether a line was *executed* by a test — not whether it
+  was *verified*.** A test that runs a line but asserts nothing still counts as
+  covered. Coverage tells you where you definitely have a gap; it can't tell you
+  your tests are any good. No tool can.
+- **So it's a floor, not a scoreboard.** "This changed line was never run by any
+  test" is a real signal worth acting on. "You're at 87%, grind to 100%" is not —
+  chasing the number rewards testing trivial getters while the risky error path
+  stays untested. That's coverage theater, and it's worse than an honest 80%.
+- **That's why patch coverage leads, and every threshold is opt-in.** The default
+  question is *"did you test what you changed?"* — not *"is your total high
+  enough?"* We don't ship a project-wide gate by default because ratcheting a
+  whole-repo number is exactly how teams end up gaming it.
+
+Use coverage to find the lines nothing tests. Use judgment for everything else.
+
 ## Philosophy
 
 - **Beautiful by default.** Zero config to start; opinionated defaults everywhere.
 - **The GitHub Action is the product.** A hosted service will only ever be a bonus.
 - **Friendly, never shaming.** Point at the next step, don't wag a finger.
+- **Coverage is a floor, not a goal.** We measure execution, never pretend it's
+  proof — and we never nag you toward 100%.
 
 ## License
 
