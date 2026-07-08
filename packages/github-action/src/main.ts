@@ -12,6 +12,7 @@ import {
   summarize,
 } from "@covallaby/core";
 import { type CoverageFormat, parseCoverage } from "@covallaby/parsers";
+import { buildAnnotations, buildStatuses } from "./checks.js";
 import { COMMENT_MARKER, type CommentInput, renderComment, renderStepSummary } from "./comment.js";
 import { parseInputs } from "./inputs.js";
 
@@ -124,6 +125,46 @@ export async function run(): Promise<void> {
     core.setOutput("ok", String(result.ok));
 
     await core.summary.addRaw(renderStepSummary(commentInput)).write();
+
+    // Diff annotations: warning boxes on uncovered changed lines.
+    if (inputs.annotations && patch) {
+      const { annotations, remaining } = buildAnnotations(patch);
+      for (const a of annotations) {
+        core.warning(a.message, {
+          title: "Covallaby",
+          file: a.file,
+          startLine: a.startLine,
+          endLine: a.endLine,
+        });
+      }
+      if (remaining > 0) {
+        core.notice(
+          `…and ${remaining} more uncovered ${remaining === 1 ? "range" : "ranges"} — the full list is in the PR comment and report artifact.`,
+          { title: "Covallaby" },
+        );
+      }
+    }
+
+    // Named entries in the PR checks list, individually requirable.
+    const headSha = github.context.payload.pull_request?.head?.sha as string | undefined;
+    if (inputs.statuses && octokit && headSha) {
+      for (const status of buildStatuses(summary, patch, inputs.thresholds, result)) {
+        try {
+          await octokit.rest.repos.createCommitStatus({
+            ...github.context.repo,
+            sha: headSha,
+            context: status.context,
+            state: status.state,
+            description: status.description,
+          });
+        } catch (error) {
+          core.warning(
+            `Couldn't create the ${status.context} status (${(error as Error).message}). Grant the job \`statuses: write\` permission, or set \`statuses: false\` to silence this.`,
+          );
+          break; // one failure means the rest will fail too
+        }
+      }
+    }
 
     if (octokit && prNumber !== undefined && inputs.comment === "update") {
       try {

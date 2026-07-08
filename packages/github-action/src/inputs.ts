@@ -7,11 +7,21 @@ export interface ActionInputs {
   stripPrefix: string;
   thresholds: Thresholds;
   comment: "update" | "off";
+  annotations: boolean;
+  statuses: boolean;
   githubToken: string;
 }
 
 export interface RawInputs {
   getInput(name: string): string;
+}
+
+function parseSwitch(raw: string, name: string, fallback: boolean): boolean {
+  const value = raw.trim().toLowerCase();
+  if (value === "") return fallback;
+  if (value === "true" || value === "on") return true;
+  if (value === "false" || value === "off") return false;
+  throw new Error(`\`${name}\` must be "true" or "false", got "${raw}".`);
 }
 
 function parsePercent(raw: string, name: string): number | undefined {
@@ -61,6 +71,8 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
     stripPrefix: raw.getInput("strip-prefix").trim() || workspace,
     thresholds,
     comment,
+    annotations: parseSwitch(raw.getInput("annotations"), "annotations", true),
+    statuses: parseSwitch(raw.getInput("statuses"), "statuses", true),
     githubToken: raw.getInput("github-token"),
   };
 }

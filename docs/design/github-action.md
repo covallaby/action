@@ -54,6 +54,26 @@ Fork PRs get a read-only token, so comment upsert failures **warn and
 continue** — the Step Summary and status still work, and the run only fails
 on genuine threshold failures.
 
+## Named statuses & diff annotations (Milestone 6)
+
+Two additions that make coverage read natively in GitHub's UI, still with no
+service behind them:
+
+- **Commit statuses** — `covallaby/project` and `covallaby/patch` entries in
+  the PR checks list via the Commit Status API, each with the percentage and
+  target in its description, individually requirable in branch protection.
+  Posted to the PR's *head* SHA (the merge-commit SHA wouldn't render in the
+  checks list). Needs `statuses: write`; failures warn-and-continue like the
+  comment does, so fork PRs stay green.
+- **Annotations** — `core.warning(..., {file, startLine, endLine})` on
+  uncovered *changed* lines, which GitHub renders directly in the PR diff.
+  Zero API calls. Capped at 10 (GitHub's per-step display limit — and our
+  never-spam rule); a closing notice says how many more there are.
+
+Both default on, switchable off via `annotations`/`statuses` inputs.
+Statuses use the head SHA from the PR payload, so they only apply in PR
+context; push builds skip them (the job's own check already covers that case).
+
 ## Bundling
 
 The Action is bundled with esbuild into a single committed

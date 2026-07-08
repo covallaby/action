@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   pull-requests: write # lets Covallaby post its sticky comment
+  statuses: write # lets Covallaby add covallaby/project + covallaby/patch checks
 
 jobs:
   test:

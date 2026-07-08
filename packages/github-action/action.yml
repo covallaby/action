@@ -28,6 +28,14 @@ inputs:
     description: "'update' (default) posts and updates one sticky PR comment; 'off' disables commenting."
     required: false
     default: update
+  annotations:
+    description: Annotate uncovered changed lines in the PR diff (max 10). Default true.
+    required: false
+    default: "true"
+  statuses:
+    description: Create covallaby/project and covallaby/patch commit statuses (needs `statuses: write`). Default true.
+    required: false
+    default: "true"
   github-token:
     description: Token used to read the PR diff and post the sticky comment.
     required: false

@@ -19739,10 +19739,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("warning", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.warning = warning2;
-    function notice(message, properties = {}) {
+    function notice2(message, properties = {}) {
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports2.notice = notice;
+    exports2.notice = notice2;
     function info2(message) {
       process.stdout.write(message + os.EOL);
     }
@@ -26569,6 +26569,42 @@ function parseCoverage(content, options = {}) {
   return parsers[format](content, stripPrefix === void 0 ? {} : { stripPrefix });
 }
 
+// src/checks.ts
+var ANNOTATION_CAP = 10;
+function buildStatuses(summary2, patch, thresholds, result) {
+  const statuses = [];
+  const failed = (kind) => result.failures.some((f) => f.kind === kind);
+  const describe = (percent2, required) => required === void 0 ? formatPercent(percent2) : `${formatPercent(percent2)} (target ${formatPercent(required)})`;
+  statuses.push({
+    context: "covallaby/project",
+    state: failed("project") ? "failure" : "success",
+    description: describe(summary2.lines.percent, thresholds.minProject)
+  });
+  if (patch && patch.lines.percent !== null) {
+    statuses.push({
+      context: "covallaby/patch",
+      state: failed("patch") || failed("new-file") ? "failure" : "success",
+      description: describe(patch.lines.percent, thresholds.minPatch)
+    });
+  }
+  return statuses;
+}
+function buildAnnotations(patch, cap = ANNOTATION_CAP) {
+  const all = [];
+  for (const file of patch.files) {
+    for (const [start, end] of file.uncovered) {
+      const count = end - start + 1;
+      all.push({
+        file: file.path,
+        startLine: start,
+        endLine: end,
+        message: count === 1 ? "This changed line isn't covered by a test yet." : `These ${count} changed lines aren't covered by a test yet.`
+      });
+    }
+  }
+  return { annotations: all.slice(0, cap), remaining: Math.max(0, all.length - cap) };
+}
+
 // src/comment.ts
 var COMMENT_MARKER = "<!-- covallaby-report:v1 -->";
 function headline({ result, patch, summary: summary2 }) {
@@ -26637,6 +26673,13 @@ function renderStepSummary(input) {
 }
 
 // src/inputs.ts
+function parseSwitch(raw, name, fallback) {
+  const value = raw.trim().toLowerCase();
+  if (value === "") return fallback;
+  if (value === "true" || value === "on") return true;
+  if (value === "false" || value === "off") return false;
+  throw new Error(`\`${name}\` must be "true" or "false", got "${raw}".`);
+}
 function parsePercent(raw, name) {
   if (raw === "") return void 0;
   const value = Number(raw);
@@ -26675,6 +26718,8 @@ function parseInputs(raw, workspace) {
     stripPrefix: raw.getInput("strip-prefix").trim() || workspace,
     thresholds,
     comment,
+    annotations: parseSwitch(raw.getInput("annotations"), "annotations", true),
+    statuses: parseSwitch(raw.getInput("statuses"), "statuses", true),
     githubToken: raw.getInput("github-token")
   };
 }
@@ -26768,6 +26813,42 @@ async function run() {
     core.setOutput("uncovered-lines", String(summary2.lines.total - summary2.lines.covered));
     core.setOutput("ok", String(result.ok));
     await core.summary.addRaw(renderStepSummary(commentInput)).write();
+    if (inputs.annotations && patch) {
+      const { annotations, remaining } = buildAnnotations(patch);
+      for (const a of annotations) {
+        core.warning(a.message, {
+          title: "Covallaby",
+          file: a.file,
+          startLine: a.startLine,
+          endLine: a.endLine
+        });
+      }
+      if (remaining > 0) {
+        core.notice(
+          `\u2026and ${remaining} more uncovered ${remaining === 1 ? "range" : "ranges"} \u2014 the full list is in the PR comment and report artifact.`,
+          { title: "Covallaby" }
+        );
+      }
+    }
+    const headSha = github.context.payload.pull_request?.head?.sha;
+    if (inputs.statuses && octokit && headSha) {
+      for (const status of buildStatuses(summary2, patch, inputs.thresholds, result)) {
+        try {
+          await octokit.rest.repos.createCommitStatus({
+            ...github.context.repo,
+            sha: headSha,
+            context: status.context,
+            state: status.state,
+            description: status.description
+          });
+        } catch (error) {
+          core.warning(
+            `Couldn't create the ${status.context} status (${error.message}). Grant the job \`statuses: write\` permission, or set \`statuses: false\` to silence this.`
+          );
+          break;
+        }
+      }
+    }
     if (octokit && prNumber !== void 0 && inputs.comment === "update") {
       try {
         await upsertComment(octokit, prNumber, renderComment(commentInput));
