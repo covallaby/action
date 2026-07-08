@@ -7,6 +7,7 @@ import {
   checkThresholds,
   computePatchCoverage,
   formatPercent,
+  matchCoveragePaths,
   mergeReports,
   parseHunks,
   summarize,
@@ -90,9 +91,13 @@ function warnOnPathMismatch(
   if (patch.lines.total > 0) return; // something matched — fine
   if (report.files.length === 0 || changed.length === 0) return; // genuinely nothing to compare
 
-  const reportPaths = new Set(report.files.map((f) => f.path));
-  const anyMatch = changed.some((c) => reportPaths.has(c.path));
-  if (anyMatch) return; // paths line up; the PR just didn't touch coverable lines
+  // Only warn if exact AND suffix matching both found nothing — otherwise the
+  // PR just didn't touch coverable lines in files that do line up.
+  const matched = matchCoveragePaths(
+    report.files.map((f) => f.path),
+    changed.map((c) => c.path),
+  );
+  if (matched.size > 0) return;
 
   const sampleReport = report.files[0]?.path ?? "?";
   const sampleDiff = changed[0]?.path ?? "?";

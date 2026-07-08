@@ -26180,11 +26180,34 @@ function checkThresholds(summary2, thresholds, patch) {
 function counter2(covered, total) {
   return { covered, total, percent: total === 0 ? null : covered / total * 100 };
 }
+function matchCoveragePaths(reportPaths, changedPaths) {
+  const result = /* @__PURE__ */ new Map();
+  const available = new Set(reportPaths);
+  const exact = new Set(reportPaths);
+  for (const d of changedPaths) {
+    if (exact.has(d)) {
+      result.set(d, d);
+      available.delete(d);
+    }
+  }
+  const remaining = changedPaths.filter((d) => !result.has(d)).sort((a, b) => b.length - a.length);
+  for (const d of remaining) {
+    const candidates = [...available].filter((c) => d === c || d.endsWith(`/${c}`));
+    if (candidates.length === 1) {
+      const c = candidates[0];
+      result.set(d, c);
+      available.delete(c);
+    }
+  }
+  return result;
+}
 function computePatchCoverage(report, changed) {
   const byPath = new Map(report.files.map((f) => [f.path, f]));
+  const matched = matchCoveragePaths(report.files.map((f) => f.path), changed.map((c) => c.path));
   const files = [];
   for (const change of changed) {
-    const coverage = byPath.get(change.path);
+    const coveragePath = matched.get(change.path);
+    const coverage = coveragePath ? byPath.get(coveragePath) : void 0;
     if (!coverage)
       continue;
     const hitsByLine = new Map(coverage.lines.map((l) => [l.line, l.hits]));
@@ -26945,9 +26968,11 @@ async function upsertComment(octokit, prNumber, body) {
 function warnOnPathMismatch(report, changed, patch) {
   if (patch.lines.total > 0) return;
   if (report.files.length === 0 || changed.length === 0) return;
-  const reportPaths = new Set(report.files.map((f) => f.path));
-  const anyMatch = changed.some((c) => reportPaths.has(c.path));
-  if (anyMatch) return;
+  const matched = matchCoveragePaths(
+    report.files.map((f) => f.path),
+    changed.map((c) => c.path)
+  );
+  if (matched.size > 0) return;
   const sampleReport = report.files[0]?.path ?? "?";
   const sampleDiff = changed[0]?.path ?? "?";
   core.warning(

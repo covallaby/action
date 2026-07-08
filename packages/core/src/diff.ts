@@ -33,12 +33,56 @@ function counter(covered: number, total: number): Counter {
  * A changed line only counts if the coverage report knows it's executable —
  * comments and blank lines never drag the number down.
  */
+/**
+ * Match a PR-diff path (always repo-relative) to a coverage file. Coverage
+ * tools often emit shorter paths than the repo: JaCoCo reports
+ * `com/example/Payment.java` for `src/main/java/com/example/Payment.java`, and
+ * Cobertura with `--cov=pkg` drops the source root. So after an exact match we
+ * fall back to a segment-anchored suffix match, but only when it's
+ * unambiguous — one coverage file left whose path is a suffix of the diff path.
+ * A coverage entry is consumed once matched, so it can't attach to two files.
+ */
+export function matchCoveragePaths(
+  reportPaths: string[],
+  changedPaths: string[],
+): Map<string, string> {
+  const result = new Map<string, string>();
+  const available = new Set(reportPaths);
+  const exact = new Set(reportPaths);
+
+  // Pass 1: exact matches (unambiguous by definition).
+  for (const d of changedPaths) {
+    if (exact.has(d)) {
+      result.set(d, d);
+      available.delete(d);
+    }
+  }
+  // Pass 2: suffix fallback for the rest, longest diff paths first so the most
+  // specific claims its coverage entry before a shorter, vaguer one.
+  const remaining = changedPaths.filter((d) => !result.has(d)).sort((a, b) => b.length - a.length);
+  for (const d of remaining) {
+    const candidates = [...available].filter((c) => d === c || d.endsWith(`/${c}`));
+    if (candidates.length === 1) {
+      const c = candidates[0]!;
+      result.set(d, c);
+      available.delete(c);
+    }
+    // zero or ambiguous (>1): leave unmatched rather than risk wrong attribution
+  }
+  return result;
+}
+
 export function computePatchCoverage(report: CoverageReport, changed: ChangedFile[]): PatchSummary {
   const byPath = new Map<string, FileCoverage>(report.files.map((f) => [f.path, f]));
+  const matched = matchCoveragePaths(
+    report.files.map((f) => f.path),
+    changed.map((c) => c.path),
+  );
   const files: PatchFileSummary[] = [];
 
   for (const change of changed) {
-    const coverage = byPath.get(change.path);
+    const coveragePath = matched.get(change.path);
+    const coverage = coveragePath ? byPath.get(coveragePath) : undefined;
     if (!coverage) continue; // not a covered file (docs, config, …)
     const hitsByLine = new Map(coverage.lines.map((l) => [l.line, l.hits]));
 

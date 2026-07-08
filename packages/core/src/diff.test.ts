@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePatchCoverage, parseHunks, parseUnifiedDiff } from "./diff.js";
+import { computePatchCoverage, matchCoveragePaths, parseHunks, parseUnifiedDiff } from "./diff.js";
 import type { CoverageReport } from "./model.js";
 
 describe("parseHunks", () => {
@@ -115,5 +115,56 @@ describe("computePatchCoverage", () => {
     ]);
     expect(patch.lines.percent).toBeNull();
     expect(patch.files).toEqual([]);
+  });
+});
+
+describe("matchCoveragePaths (suffix fallback)", () => {
+  it("matches JaCoCo package paths to repo paths", () => {
+    const m = matchCoveragePaths(
+      ["com/example/pay/Payment.java", "com/example/Main.java"],
+      ["src/main/java/com/example/pay/Payment.java", "docs/README.md"],
+    );
+    expect(m.get("src/main/java/com/example/pay/Payment.java")).toBe(
+      "com/example/pay/Payment.java",
+    );
+    expect(m.has("docs/README.md")).toBe(false);
+  });
+
+  it("matches Cobertura --cov=pkg (source root dropped)", () => {
+    const m = matchCoveragePaths(["payment.py"], ["src/payment.py"]);
+    expect(m.get("src/payment.py")).toBe("payment.py");
+  });
+
+  it("prefers exact matches and never double-attributes", () => {
+    const m = matchCoveragePaths(["a/util.py", "b/util.py"], ["src/a/util.py", "src/b/util.py"]);
+    expect(m.get("src/a/util.py")).toBe("a/util.py");
+    expect(m.get("src/b/util.py")).toBe("b/util.py");
+    expect(new Set(m.values()).size).toBe(2); // no coverage entry reused
+  });
+
+  it("skips genuinely ambiguous filename-only matches", () => {
+    // one coverage 'util.py' can't be attributed to two changed util.py files
+    const m = matchCoveragePaths(["util.py"], ["src/a/util.py", "src/b/util.py"]);
+    expect(m.size).toBe(1); // longest-first claims one; the other stays unmatched
+  });
+
+  it("computePatchCoverage uses the fallback end to end", () => {
+    const report: CoverageReport = {
+      files: [
+        {
+          path: "com/example/Payment.java",
+          lines: [
+            { line: 5, hits: 1 },
+            { line: 6, hits: 0 },
+          ],
+          functions: [],
+          branches: [],
+        },
+      ],
+    };
+    const patch = computePatchCoverage(report, [
+      { path: "src/main/java/com/example/Payment.java", added: false, lines: [5, 6] },
+    ]);
+    expect(patch.lines).toEqual({ covered: 1, total: 2, percent: 50 });
   });
 });
