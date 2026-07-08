@@ -7,7 +7,7 @@ on:
 
 jobs:
   ci:
-    name: Lint, build, test
+    name: CI + coverage gate
     runs-on: ubuntu-latest
     permissions:
       contents: read
