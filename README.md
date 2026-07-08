@@ -3,7 +3,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/covallaby/action/actions/workflows/ci.yml"><img src="https://github.com/covallaby/action/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://covallaby.com"><b>covallaby.com</b></a> &nbsp;·&nbsp;
+  <a href="https://covallaby.com/demo/">Live demo</a> &nbsp;·&nbsp;
+  <a href="https://github.com/covallaby/action/actions/workflows/ci.yml"><img src="https://github.com/covallaby/action/actions/workflows/ci.yml/badge.svg" alt="CI" valign="middle"></a>
 </p>
 
 **Beautiful coverage reports for your pull requests.** No account, no upload
