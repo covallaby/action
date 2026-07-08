@@ -251,6 +251,13 @@ pnpm verify   # lint + build + typecheck + test
 | `@covallaby/html-report` | Single-file HTML report (React + Tailwind) |
 | `@covallaby/github-action` | The Action |
 
+## Coverage over time
+
+Want history, dashboards, and a live badge URL? Run the optional
+[**Covallaby server**](https://github.com/covallaby/server) — one tiny
+self-hosted process (built-in SQLite or your Postgres), one `curl` from CI.
+The Action never requires it.
+
 ## Philosophy
 
 - **Beautiful by default.** Zero config to start; opinionated defaults everywhere.
