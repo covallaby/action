@@ -28,6 +28,10 @@ inputs:
     description: "'update' (default) posts and updates one sticky PR comment; 'off' disables commenting."
     required: false
     default: update
+  check:
+    description: "Create a rich 'Covallaby' entry in the Checks tab with the full report and annotations (needs the `checks: write` permission). Default true."
+    required: false
+    default: "true"
   annotations:
     description: "Annotate uncovered changed lines in the PR diff (max 10). Default true."
     required: false

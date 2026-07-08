@@ -7,6 +7,7 @@ export interface ActionInputs {
   stripPrefix: string;
   thresholds: Thresholds;
   comment: "update" | "off";
+  check: boolean;
   annotations: boolean;
   statuses: boolean;
   githubToken: string;
@@ -71,6 +72,7 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
     stripPrefix: raw.getInput("strip-prefix").trim() || workspace,
     thresholds,
     comment,
+    check: parseSwitch(raw.getInput("check"), "check", true),
     annotations: parseSwitch(raw.getInput("annotations"), "annotations", true),
     statuses: parseSwitch(raw.getInput("statuses"), "statuses", true),
     githubToken: raw.getInput("github-token"),

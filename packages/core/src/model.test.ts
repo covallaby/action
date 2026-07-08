@@ -4,6 +4,7 @@ import {
   formatRanges,
   isFullyCovered,
   mergeReports,
+  rollupByDirectory,
   summarize,
   uncoveredRanges,
 } from "./model.js";
@@ -93,5 +94,25 @@ describe("isFullyCovered", () => {
     expect(isFullyCovered({ covered: 4, total: 4, percent: 100 })).toBe(true);
     expect(isFullyCovered({ covered: 3, total: 4, percent: 75 })).toBe(false);
     expect(isFullyCovered({ covered: 0, total: 0, percent: null })).toBe(false);
+describe("rollupByDirectory", () => {
+  it("aggregates file counters per dirname, worst first", () => {
+    const dirs = rollupByDirectory(summarize(report));
+    expect(dirs.map((d) => d.path)).toEqual(["src"]);
+    expect(dirs[0]!.lines).toEqual({ covered: 3, total: 6, percent: 50 });
+  });
+
+  it("groups root-level files under '.'", () => {
+    const rolled = rollupByDirectory(
+      summarize({
+        files: [
+          { path: "main.ts", lines: [{ line: 1, hits: 1 }], functions: [], branches: [] },
+          { path: "src/a.ts", lines: [{ line: 1, hits: 0 }], functions: [], branches: [] },
+        ],
+      }),
+    );
+    expect(rolled.map((d) => [d.path, d.lines.percent])).toEqual([
+      ["src", 0],
+      [".", 100],
+    ]);
   });
 });

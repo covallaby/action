@@ -8,6 +8,7 @@ permissions:
   contents: read
   pull-requests: write # lets Covallaby post its sticky comment
   statuses: write # lets Covallaby add covallaby/project + covallaby/patch checks
+  checks: write # lets Covallaby add its rich Checks-tab entry
 
 jobs:
   test:

@@ -52,6 +52,40 @@ export function buildStatuses(
   return statuses;
 }
 
+export interface CheckRun {
+  name: "Covallaby";
+  conclusion: "success" | "failure";
+  /** One line: the verdict with the numbers that matter. */
+  title: string;
+}
+
+/** The rich Checks-tab entry; its markdown body is the step summary. */
+export function buildCheckRun(
+  summary: ReportSummary,
+  patch: PatchSummary | null,
+  thresholds: Thresholds,
+  result: CheckResult,
+): CheckRun {
+  const project = `project ${formatPercent(summary.lines.percent)}`;
+  const patchPart =
+    patch && patch.lines.percent !== null ? `patch ${formatPercent(patch.lines.percent)}` : null;
+  const numbers = [patchPart, project].filter(Boolean).join(" · ");
+
+  if (!result.ok) {
+    const worst = result.failures[0]!;
+    return {
+      name: "Covallaby",
+      conclusion: "failure",
+      title: `${numbers} — ${worst.kind === "project" ? "project" : "patch"} needs ${formatPercent(worst.required)}`,
+    };
+  }
+  return {
+    name: "Covallaby",
+    conclusion: "success",
+    title: `You're covered — ${numbers}`,
+  };
+}
+
 export interface Annotation {
   file: string;
   startLine: number;
