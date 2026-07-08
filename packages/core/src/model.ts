@@ -192,3 +192,8 @@ function mergeInto(target: FileCoverage, source: FileCoverage): void {
   }
   target.branches.sort((a, b) => a.line - b.line);
 }
+
+/** True when every coverable unit in the counter was hit. */
+export function isFullyCovered(counter: Counter): boolean {
+  return counter.total > 0 && counter.covered === counter.total;
+}
