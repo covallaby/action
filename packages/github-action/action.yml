@@ -44,5 +44,5 @@ outputs:
     description: "'true' when every configured threshold passed."
 
 runs:
-  using: node20
+  using: node24
   main: dist/index.cjs
