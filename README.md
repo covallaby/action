@@ -273,3 +273,7 @@ The Action never requires it.
 ## License
 
 MIT
+
+---
+
+<sub>Created by [Josh Holtz](https://github.com/joshdholtz) · [Mostly Good LLC](https://mostlygood.dev) · MIT</sub>

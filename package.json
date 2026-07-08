@@ -22,5 +22,7 @@
     "@vitest/coverage-v8": "^3",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
-  }
+  },
+  "author": "Josh Holtz <me@joshholtz.com> (https://mostlygood.dev)",
+  "homepage": "https://covallaby.com"
 }
