@@ -13,6 +13,9 @@ export default defineConfig({
   },
   test: {
     include: ["packages/*/src/**/*.test.ts", "packages/*/test/**/*.test.ts"],
+    // picocolors turns ANSI on when CI is set; pin it off so human-output
+    // snapshots are identical locally and on CI.
+    env: { NO_COLOR: "1" },
     coverage: {
       provider: "v8",
       reporter: ["lcov", "text-summary"],
