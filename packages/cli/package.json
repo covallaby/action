@@ -1,0 +1,26 @@
+{
+  "name": "covallaby",
+  "version": "0.1.0",
+  "description": "Beautiful coverage reports for your pull requests.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "covallaby": "./dist/bin.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@covallaby/core": "workspace:*",
+    "@covallaby/parsers": "workspace:*",
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1"
+  }
+}

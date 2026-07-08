@@ -1,0 +1,15 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderReport > renders the friendly human summary 1`] = `
+"
+  🦘 Covallaby
+
+  Project coverage   50.0%
+  Functions          100.0%
+  4 of 8 lines covered across 3 files
+
+  4 uncovered lines need some love:
+    src/payment.ts:3-4, 12
+    src/checkout.ts:88
+"
+`;
