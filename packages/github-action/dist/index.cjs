@@ -26076,6 +26076,27 @@ function mergeInto(target, source) {
   }
   target.branches.sort((a, b) => a.line - b.line);
 }
+function rollupByDirectory(summary2) {
+  const byDir = /* @__PURE__ */ new Map();
+  for (const file of summary2.files) {
+    const slash = file.path.lastIndexOf("/");
+    const dir = slash === -1 ? "." : file.path.slice(0, slash);
+    const entry = byDir.get(dir) ?? { lines: [0, 0], functions: [0, 0], branches: [0, 0] };
+    byDir.set(dir, entry);
+    entry.lines[0] += file.lines.covered;
+    entry.lines[1] += file.lines.total;
+    entry.functions[0] += file.functions.covered;
+    entry.functions[1] += file.functions.total;
+    entry.branches[0] += file.branches.covered;
+    entry.branches[1] += file.branches.total;
+  }
+  return [...byDir.entries()].map(([path, e]) => ({
+    path,
+    lines: counter(...e.lines),
+    functions: counter(...e.functions),
+    branches: counter(...e.branches)
+  })).sort((a, b) => (a.lines.percent ?? 101) - (b.lines.percent ?? 101));
+}
 
 // ../core/dist/thresholds.js
 function formatPercent(value) {
@@ -26589,6 +26610,24 @@ function buildStatuses(summary2, patch, thresholds, result) {
   }
   return statuses;
 }
+function buildCheckRun(summary2, patch, thresholds, result) {
+  const project = `project ${formatPercent(summary2.lines.percent)}`;
+  const patchPart = patch && patch.lines.percent !== null ? `patch ${formatPercent(patch.lines.percent)}` : null;
+  const numbers = [patchPart, project].filter(Boolean).join(" \xB7 ");
+  if (!result.ok) {
+    const worst = result.failures[0];
+    return {
+      name: "Covallaby",
+      conclusion: "failure",
+      title: `${numbers} \u2014 ${worst.kind === "project" ? "project" : "patch"} needs ${formatPercent(worst.required)}`
+    };
+  }
+  return {
+    name: "Covallaby",
+    conclusion: "success",
+    title: `You're covered \u2014 ${numbers}`
+  };
+}
 function buildAnnotations(patch, cap = ANNOTATION_CAP) {
   const all = [];
   for (const file of patch.files) {
@@ -26661,10 +26700,54 @@ function renderComment(input) {
     lines.push("Nice jump! Every changed line that can be tested, is. \u{1F389}");
     lines.push("");
   }
+  lines.push(...renderBreakdown(summary2, patch));
   lines.push(
     `<sub>${summary2.lines.covered} of ${summary2.lines.total} lines covered across ${summary2.totalFiles} files \xB7 [Covallaby](https://github.com/covallaby/covallaby)</sub>`
   );
   return lines.join("\n");
+}
+var BREAKDOWN_ROWS = 20;
+function renderBreakdown(summary2, patch) {
+  const lines = [];
+  const changed = (patch?.files ?? []).filter((f) => f.lines.total > 0);
+  if (changed.length > 0) {
+    const rows = [...changed].sort((a, b) => (a.lines.percent ?? 101) - (b.lines.percent ?? 101));
+    lines.push("<details>");
+    lines.push(`<summary>Changed files (${rows.length})</summary>`);
+    lines.push("");
+    lines.push("| File | Patch | Missing |");
+    lines.push("|---|---|---|");
+    for (const f of rows.slice(0, BREAKDOWN_ROWS)) {
+      const missing = f.uncovered.length > 0 ? `\`${formatRanges(f.uncovered)}\`` : "\u2014";
+      lines.push(`| \`${f.path}\` | ${formatPercent(f.lines.percent)} | ${missing} |`);
+    }
+    if (rows.length > BREAKDOWN_ROWS) {
+      lines.push(`| \u2026and ${rows.length - BREAKDOWN_ROWS} more | | |`);
+    }
+    lines.push("");
+    lines.push("</details>");
+    lines.push("");
+  }
+  const dirs = rollupByDirectory(summary2);
+  if (dirs.length > 1) {
+    lines.push("<details>");
+    lines.push(`<summary>Project by directory (${dirs.length})</summary>`);
+    lines.push("");
+    lines.push("| Directory | Lines | Coverage |");
+    lines.push("|---|---|---|");
+    for (const d of dirs.slice(0, BREAKDOWN_ROWS)) {
+      lines.push(
+        `| \`${d.path}/\` | ${d.lines.covered}/${d.lines.total} | ${formatPercent(d.lines.percent)} |`
+      );
+    }
+    if (dirs.length > BREAKDOWN_ROWS) {
+      lines.push(`| \u2026and ${dirs.length - BREAKDOWN_ROWS} more | | |`);
+    }
+    lines.push("");
+    lines.push("</details>");
+    lines.push("");
+  }
+  return lines;
 }
 function renderStepSummary(input) {
   return renderComment(input).replace(`${COMMENT_MARKER}
@@ -26718,6 +26801,7 @@ function parseInputs(raw, workspace) {
     stripPrefix: raw.getInput("strip-prefix").trim() || workspace,
     thresholds,
     comment,
+    check: parseSwitch(raw.getInput("check"), "check", true),
     annotations: parseSwitch(raw.getInput("annotations"), "annotations", true),
     statuses: parseSwitch(raw.getInput("statuses"), "statuses", true),
     githubToken: raw.getInput("github-token")
@@ -26813,7 +26897,38 @@ async function run() {
     core.setOutput("uncovered-lines", String(summary2.lines.total - summary2.lines.covered));
     core.setOutput("ok", String(result.ok));
     await core.summary.addRaw(renderStepSummary(commentInput)).write();
-    if (inputs.annotations && patch) {
+    const headSha = github.context.payload.pull_request?.head?.sha;
+    let checkRunCreated = false;
+    if (inputs.check && octokit && headSha) {
+      const checkRun = buildCheckRun(summary2, patch, inputs.thresholds, result);
+      const checkAnnotations = patch ? buildAnnotations(patch, 50).annotations : [];
+      try {
+        await octokit.rest.checks.create({
+          ...github.context.repo,
+          name: checkRun.name,
+          head_sha: headSha,
+          status: "completed",
+          conclusion: checkRun.conclusion,
+          output: {
+            title: checkRun.title,
+            summary: renderStepSummary(commentInput),
+            annotations: checkAnnotations.map((a) => ({
+              path: a.file,
+              start_line: a.startLine,
+              end_line: a.endLine,
+              annotation_level: "warning",
+              message: a.message
+            }))
+          }
+        });
+        checkRunCreated = true;
+      } catch (error) {
+        core.warning(
+          `Couldn't create the Covallaby check run (${error.message}). Grant the job \`checks: write\` permission, or set \`check: false\` to silence this.`
+        );
+      }
+    }
+    if (inputs.annotations && !checkRunCreated && patch) {
       const { annotations, remaining } = buildAnnotations(patch);
       for (const a of annotations) {
         core.warning(a.message, {
@@ -26830,7 +26945,6 @@ async function run() {
         );
       }
     }
-    const headSha = github.context.payload.pull_request?.head?.sha;
     if (inputs.statuses && octokit && headSha) {
       for (const status of buildStatuses(summary2, patch, inputs.thresholds, result)) {
         try {

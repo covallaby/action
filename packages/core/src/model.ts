@@ -192,3 +192,37 @@ function mergeInto(target: FileCoverage, source: FileCoverage): void {
   }
   target.branches.sort((a, b) => a.line - b.line);
 }
+
+/**
+ * Roll file summaries up to their directory (the path's dirname), for
+ * compact by-module breakdowns. Root-level files group under ".".
+ * Sorted lowest coverage first — what needs attention leads.
+ */
+export function rollupByDirectory(summary: ReportSummary): FileSummary[] {
+  interface Tally {
+    lines: [number, number];
+    functions: [number, number];
+    branches: [number, number];
+  }
+  const byDir = new Map<string, Tally>();
+  for (const file of summary.files) {
+    const slash = file.path.lastIndexOf("/");
+    const dir = slash === -1 ? "." : file.path.slice(0, slash);
+    const entry = byDir.get(dir) ?? { lines: [0, 0], functions: [0, 0], branches: [0, 0] };
+    byDir.set(dir, entry);
+    entry.lines[0] += file.lines.covered;
+    entry.lines[1] += file.lines.total;
+    entry.functions[0] += file.functions.covered;
+    entry.functions[1] += file.functions.total;
+    entry.branches[0] += file.branches.covered;
+    entry.branches[1] += file.branches.total;
+  }
+  return [...byDir.entries()]
+    .map(([path, e]) => ({
+      path,
+      lines: counter(...e.lines),
+      functions: counter(...e.functions),
+      branches: counter(...e.branches),
+    }))
+    .sort((a, b) => (a.lines.percent ?? 101) - (b.lines.percent ?? 101));
+}

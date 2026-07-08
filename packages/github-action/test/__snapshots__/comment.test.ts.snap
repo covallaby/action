@@ -20,5 +20,15 @@ One thing to look at before merging.
 - \`src/payment.ts:42, 44-45\`
 - \`src/checkout.ts:88\`
 
+<details>
+<summary>Changed files (2)</summary>
+
+| File | Patch | Missing |
+|---|---|---|
+| \`src/checkout.ts\` | 0.0% | \`88\` |
+| \`src/payment.ts\` | 25.0% | \`42, 44-45\` |
+
+</details>
+
 <sub>3 of 7 lines covered across 2 files · [Covallaby](https://github.com/covallaby/covallaby)</sub>"
 `;
