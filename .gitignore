@@ -5,3 +5,9 @@ dist/
 coverage/
 *.log
 .DS_Store
+
+# Full-resolution brand sources stay local; optimized copies live in brand/web/
+brand/assets/
+brand/brand-boards/
+brand/mockups/
+brand/prompts/

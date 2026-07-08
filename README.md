@@ -1,6 +1,10 @@
-# 🦘 Covallaby
+<p align="center">
+  <img src="brand/web/readme-header.png" alt="You write code. We cover it. — Covallaby generates beautiful coverage reports for your pull requests." width="820">
+</p>
 
-[![CI](https://github.com/covallaby/action/actions/workflows/ci.yml/badge.svg)](https://github.com/covallaby/action/actions/workflows/ci.yml)
+<p align="center">
+  <a href="https://github.com/covallaby/action/actions/workflows/ci.yml"><img src="https://github.com/covallaby/action/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
 **Beautiful coverage reports for your pull requests.** No account, no upload
 token, no dashboard you didn't ask for — one workflow step, and every PR
