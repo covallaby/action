@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type CoverageReport,
   formatRanges,
+  isFullyCovered,
   mergeReports,
   rollupByDirectory,
   summarize,
@@ -85,6 +86,14 @@ describe("mergeReports", () => {
       [3, 3],
       [9, 9],
     ]);
+  });
+});
+
+describe("isFullyCovered", () => {
+  it("is true only when everything coverable was hit", () => {
+    expect(isFullyCovered({ covered: 4, total: 4, percent: 100 })).toBe(true);
+    expect(isFullyCovered({ covered: 3, total: 4, percent: 75 })).toBe(false);
+    expect(isFullyCovered({ covered: 0, total: 0, percent: null })).toBe(false);
   });
 });
 
