@@ -29,7 +29,10 @@ function loadOptions(opts: CommonOptions) {
 
 function addCommonOptions(cmd: Command): Command {
   return cmd
-    .option("--format <format>", "coverage format (default: auto-detect). Supported: lcov")
+    .option(
+      "--format <format>",
+      "coverage format (default: auto-detect). Supported: lcov, jacoco, cobertura, xccov",
+    )
     .option("--strip-prefix <prefix>", "path prefix to strip so paths are repo-relative")
     .option("--json", "print machine-readable JSON instead of human output");
 }
@@ -168,7 +171,7 @@ export function buildProgram(): Command {
         return {
           file,
           ok: true as const,
-          format: opts.format ?? "lcov",
+          format: opts.format ?? detectFormat(readFileSync(file, "utf8")) ?? "unknown",
           files: summary.totalFiles,
           lines: summary.lines.total,
         };

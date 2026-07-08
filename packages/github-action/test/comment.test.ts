@@ -92,8 +92,9 @@ describe("parseInputs", () => {
     expect(() => parseInputs(raw({ files: "a", "min-project": "banana" }), "/w")).toThrowError(
       /between 0 and 100/,
     );
-    expect(() => parseInputs(raw({ files: "a", format: "jacoco" }), "/w")).toThrowError(
-      /currently understands: lcov/,
+    expect(parseInputs(raw({ files: "a", format: "jacoco" }), "/w").format).toBe("jacoco");
+    expect(() => parseInputs(raw({ files: "a", format: "clover" }), "/w")).toThrowError(
+      /understands: lcov, jacoco, cobertura, xccov/,
     );
     expect(() => parseInputs(raw({ files: " " }), "/w")).toThrowError(/`files` is required/);
   });

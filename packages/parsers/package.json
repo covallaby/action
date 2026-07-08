@@ -21,6 +21,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@covallaby/core": "workspace:*"
+    "@covallaby/core": "workspace:*",
+    "fast-xml-parser": "^4.5.1"
   }
 }

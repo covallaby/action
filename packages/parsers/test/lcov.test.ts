@@ -67,6 +67,6 @@ describe("detectFormat / parseCoverage", () => {
   });
 
   it("gives a friendly error for unknown formats", () => {
-    expect(() => parseCoverage("<coverage/>")).toThrowError(/coming soon/);
+    expect(() => parseCoverage("no format here")).toThrowError(/lcov, jacoco, cobertura, xccov/);
   });
 });

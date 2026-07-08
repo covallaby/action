@@ -1,5 +1,5 @@
 import type { Thresholds } from "@covallaby/core";
-import type { CoverageFormat } from "@covallaby/parsers";
+import { COVERAGE_FORMATS, type CoverageFormat } from "@covallaby/parsers";
 
 export interface ActionInputs {
   files: string[];
@@ -36,8 +36,10 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
   }
 
   const format = raw.getInput("format").trim();
-  if (format !== "" && format !== "lcov") {
-    throw new Error(`Unsupported format "${format}". Covallaby currently understands: lcov.`);
+  if (format !== "" && !COVERAGE_FORMATS.includes(format as CoverageFormat)) {
+    throw new Error(
+      `Unsupported format "${format}". Covallaby understands: ${COVERAGE_FORMATS.join(", ")}.`,
+    );
   }
 
   const comment = raw.getInput("comment").trim() || "update";
@@ -55,7 +57,7 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
 
   return {
     files,
-    ...(format === "lcov" && { format }),
+    ...(format !== "" && { format: format as CoverageFormat }),
     stripPrefix: raw.getInput("strip-prefix").trim() || workspace,
     thresholds,
     comment,

@@ -11,7 +11,7 @@ import {
   parseHunks,
   summarize,
 } from "@covallaby/core";
-import { parseCoverage } from "@covallaby/parsers";
+import { type CoverageFormat, parseCoverage } from "@covallaby/parsers";
 import { COMMENT_MARKER, type CommentInput, renderComment, renderStepSummary } from "./comment.js";
 import { parseInputs } from "./inputs.js";
 
@@ -19,7 +19,7 @@ type Octokit = ReturnType<typeof github.getOctokit>;
 
 function loadReport(
   files: string[],
-  format: "lcov" | undefined,
+  format: CoverageFormat | undefined,
   stripPrefix: string,
 ): CoverageReport {
   const reports = files.map((file) => {

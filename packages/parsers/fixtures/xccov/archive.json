@@ -1,0 +1,13 @@
+{
+  "/Users/dev/App/Sources/Payment.swift": [
+    { "line": 1, "isExecutable": false, "executionCount": null },
+    { "line": 2, "isExecutable": true, "executionCount": 8 },
+    { "line": 3, "isExecutable": true, "executionCount": null, "subranges": [{ "column": 5, "length": 10, "executionCount": 8 }, { "column": 20, "length": 4, "executionCount": 0 }] },
+    { "line": 4, "isExecutable": true, "executionCount": 0 },
+    { "line": 5, "isExecutable": false, "executionCount": null }
+  ],
+  "/Users/dev/App/Sources/Checkout.swift": [
+    { "line": 1, "isExecutable": true, "executionCount": 3 },
+    { "line": 2, "isExecutable": true, "executionCount": 3 }
+  ]
+}

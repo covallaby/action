@@ -27,7 +27,11 @@ Early days — the CLI works today; the GitHub Action is next.
 - ✅ **Milestone 2** — coverage model, LCOV parser, CLI
 - ✅ **Milestone 3** — GitHub Action: sticky PR comments, patch coverage, thresholds, Step Summary
 - ✅ **Milestone 4** — static HTML report: one self-contained file, dark mode, searchable
-- 🔜 **Milestone 5** — JaCoCo, Cobertura, and xccov parsers
+- ✅ **Milestone 5** — JaCoCo, Cobertura, and xccov parsers
+
+Formats are auto-detected from content: **LCOV**, **JaCoCo XML**,
+**Cobertura XML** (coverage.py, coverlet, gcovr, …), and **xccov** per-line JSON
+(`xcrun xccov view --archive --json Result.xcresult`).
 
 ## CLI
 

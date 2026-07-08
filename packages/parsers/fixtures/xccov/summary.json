@@ -1,0 +1,13 @@
+{
+  "coveredLines": 120,
+  "lineCoverage": 0.85,
+  "targets": [
+    {
+      "name": "App.app",
+      "lineCoverage": 0.85,
+      "files": [
+        { "path": "/Users/dev/App/Sources/Payment.swift", "lineCoverage": 0.75, "coveredLines": 30 }
+      ]
+    }
+  ]
+}

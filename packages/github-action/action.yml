@@ -10,7 +10,7 @@ inputs:
     description: Coverage files, newline- or comma-separated (e.g. coverage/lcov.info). Merged if several.
     required: true
   format:
-    description: "Coverage format (default: auto-detect). Supported: lcov."
+    description: "Coverage format (default: auto-detect). Supported: lcov, jacoco, cobertura, xccov."
     required: false
   strip-prefix:
     description: Path prefix to strip so file paths are repo-relative. Defaults to the workspace directory.
