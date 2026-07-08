@@ -18,6 +18,25 @@ answers the only question that matters: *can I merge this?*
 >
 > Nice jump! Every changed line that can be tested, is. 🎉
 
+## Install
+
+The fastest way — paste this into your coding agent (Claude Code, Cursor,
+Copilot…) and it wires everything up for your stack, coverage file included:
+
+```text
+Read https://raw.githubusercontent.com/covallaby/covallaby/main/llms-install.md and set up Covallaby in this repository.
+```
+
+Or from a terminal with Claude Code:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/covallaby/covallaby/main/llms-install.md | claude
+```
+
+[`llms-install.md`](llms-install.md) walks the agent through producing a
+coverage file for your stack, wiring the workflow, and verifying the result.
+Prefer doing it by hand? Keep reading.
+
 ## Quick start
 
 ```yaml
@@ -62,22 +81,6 @@ That's the whole setup. Every PR then gets:
 See it live: [a passing PR](https://github.com/covallaby/covallaby/pull/1) ·
 [a failing PR](https://github.com/covallaby/covallaby/pull/2) ·
 [a docs-only PR](https://github.com/covallaby/covallaby/pull/3).
-
-## 🤖 Install with AI
-
-Tell your coding agent (Claude Code, Cursor, Copilot…):
-
-> Read https://raw.githubusercontent.com/covallaby/covallaby/main/llms-install.md
-> and set up Covallaby in this repository.
-
-Or from a terminal with Claude Code:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/covallaby/covallaby/main/llms-install.md | claude
-```
-
-[`llms-install.md`](llms-install.md) walks the agent through producing a
-coverage file for your stack, wiring the workflow, and verifying the result.
 
 ## Producing a coverage file
 
