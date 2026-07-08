@@ -12,7 +12,7 @@ import {
   summarize,
 } from "@covallaby/core";
 import { type CoverageFormat, parseCoverage } from "@covallaby/parsers";
-import { buildAnnotations, buildStatuses } from "./checks.js";
+import { buildAnnotations, buildCheckRun, buildStatuses } from "./checks.js";
 import { COMMENT_MARKER, type CommentInput, renderComment, renderStepSummary } from "./comment.js";
 import { parseInputs } from "./inputs.js";
 
@@ -126,8 +126,42 @@ export async function run(): Promise<void> {
 
     await core.summary.addRaw(renderStepSummary(commentInput)).write();
 
-    // Diff annotations: warning boxes on uncovered changed lines.
-    if (inputs.annotations && patch) {
+    // Rich Checks-tab entry: title, full markdown report, and annotations.
+    const headSha = github.context.payload.pull_request?.head?.sha as string | undefined;
+    let checkRunCreated = false;
+    if (inputs.check && octokit && headSha) {
+      const checkRun = buildCheckRun(summary, patch, inputs.thresholds, result);
+      const checkAnnotations = patch ? buildAnnotations(patch, 50).annotations : [];
+      try {
+        await octokit.rest.checks.create({
+          ...github.context.repo,
+          name: checkRun.name,
+          head_sha: headSha,
+          status: "completed",
+          conclusion: checkRun.conclusion,
+          output: {
+            title: checkRun.title,
+            summary: renderStepSummary(commentInput),
+            annotations: checkAnnotations.map((a) => ({
+              path: a.file,
+              start_line: a.startLine,
+              end_line: a.endLine,
+              annotation_level: "warning" as const,
+              message: a.message,
+            })),
+          },
+        });
+        checkRunCreated = true;
+      } catch (error) {
+        core.warning(
+          `Couldn't create the Covallaby check run (${(error as Error).message}). Grant the job \`checks: write\` permission, or set \`check: false\` to silence this.`,
+        );
+      }
+    }
+
+    // Diff annotations via log commands — only when the check run (which
+    // carries richer annotations) didn't land, to avoid duplicates.
+    if (inputs.annotations && !checkRunCreated && patch) {
       const { annotations, remaining } = buildAnnotations(patch);
       for (const a of annotations) {
         core.warning(a.message, {
@@ -146,7 +180,6 @@ export async function run(): Promise<void> {
     }
 
     // Named entries in the PR checks list, individually requirable.
-    const headSha = github.context.payload.pull_request?.head?.sha as string | undefined;
     if (inputs.statuses && octokit && headSha) {
       for (const status of buildStatuses(summary, patch, inputs.thresholds, result)) {
         try {

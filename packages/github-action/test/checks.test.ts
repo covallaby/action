@@ -1,7 +1,7 @@
 import { type PatchSummary, checkThresholds, summarize } from "@covallaby/core";
 import { parseLcov } from "@covallaby/parsers";
 import { describe, expect, it } from "vitest";
-import { buildAnnotations, buildStatuses } from "../src/checks.js";
+import { buildAnnotations, buildCheckRun, buildStatuses } from "../src/checks.js";
 
 const summary = summarize(parseLcov("SF:src/a.ts\nDA:1,1\nDA:2,1\nDA:3,0\nDA:4,1\nend_of_record"));
 
@@ -42,6 +42,29 @@ describe("buildStatuses", () => {
     const empty: PatchSummary = { lines: { covered: 0, total: 0, percent: null }, files: [] };
     const statuses = buildStatuses(summary, empty, {}, checkThresholds(summary, {}, empty));
     expect(statuses.map((s) => s.context)).toEqual(["covallaby/project"]);
+  });
+});
+
+describe("buildCheckRun", () => {
+  it("summarizes a failure with the gap that matters", () => {
+    const thresholds = { minPatch: 85 };
+    const run = buildCheckRun(
+      summary,
+      patch,
+      thresholds,
+      checkThresholds(summary, thresholds, patch),
+    );
+    expect(run).toEqual({
+      name: "Covallaby",
+      conclusion: "failure",
+      title: "patch 40.0% · project 75.0% — patch needs 85.0%",
+    });
+  });
+
+  it("celebrates success", () => {
+    const run = buildCheckRun(summary, patch, {}, checkThresholds(summary, {}, patch));
+    expect(run.conclusion).toBe("success");
+    expect(run.title).toBe("You're covered — patch 40.0% · project 75.0%");
   });
 });
 
