@@ -9,6 +9,9 @@ jobs:
   ci:
     name: Lint, build, test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # to refresh the committed coverage badge on main
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -49,8 +52,48 @@ jobs:
       - name: HTML report
         run: node packages/cli/dist/bin.js html coverage/lcov.info --strip-prefix "$PWD" -o covallaby-report
 
+      - name: Coverage badge
+        run: node packages/cli/dist/bin.js badge coverage/lcov.info --strip-prefix "$PWD" -o covallaby-report/coverage-badge.svg
+
       - name: Upload HTML report
         uses: actions/upload-artifact@v4
         with:
           name: covallaby-report
           path: covallaby-report
+
+      # The README renders this badge; only commit when the number changed.
+      - name: Refresh committed badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cp covallaby-report/coverage-badge.svg docs/coverage-badge.svg
+          if ! git diff --quiet docs/coverage-badge.svg; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/coverage-badge.svg
+            git commit -m "Update coverage badge [skip ci]"
+            git push
+          fi
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: covallaby-report
+
+  # Publishes the live report at https://covallaby.github.io/covallaby/ —
+  # GitHub Pages needs the repo to be public (or a paid plan), so this job
+  # is non-blocking until then.
+  pages:
+    if: github.ref == 'refs/heads/main'
+    needs: ci
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
