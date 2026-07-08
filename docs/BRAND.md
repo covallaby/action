@@ -1,6 +1,10 @@
 
 # Covallaby Brand
 
+> The full brand kit — logos, icons, favicon, social preview, design tokens,
+> and the canonical [brand guide](../brand/docs/BRAND_GUIDE.md) — lives in
+> [`brand/`](../brand/). This file is the original spec it grew from.
+
 ## Mascot
 
 A cute wallaby—not a kangaroo.

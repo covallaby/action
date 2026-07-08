@@ -1,41 +1,64 @@
-# 🦘 Covallaby
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./brand/svg/logo-horizontal-dark.svg">
+    <img src="./brand/svg/logo-horizontal.svg" alt="Covallaby" width="420">
+  </picture>
+</p>
 
-> Beautiful coverage reports for your pull requests.
+<p align="center">
+  <strong>Beautiful coverage reports for your pull requests.</strong>
+</p>
 
-Covallaby is a GitHub-first code coverage tool. No account, no upload token,
-no dashboard you didn't ask for — just a friendly summary of what's covered,
-what isn't, and whether you can merge.
+<p align="center">
+  No account. No upload token. No dashboard you didn't ask for.<br>
+  Just a friendly answer to the only question that matters: <em>can I merge this?</em>
+</p>
 
+---
+
+```yaml
+- uses: covallaby/covallaby/packages/github-action@main
+  with:
+    files: coverage/lcov.info
+    min-patch: 85
 ```
-  🦘 Covallaby
 
-  Project coverage   91.4%
-  Functions          88.0%
-  Branches           76.2%
-  842 of 921 lines covered across 47 files
+That's the whole setup. Every pull request gets one sticky comment — updated
+in place on each push, never spamming your PR — plus a Step Summary and a
+pass/fail status check:
 
-  3 uncovered lines need some love:
-    src/payment.ts:44-45
-    src/checkout.ts:88
-```
+> ## 🦘 Covallaby
+>
+> You're covered.
+>
+> | Metric | Result |
+> |---|---|
+> | Project coverage | 91.4% |
+> | Patch coverage | 96.8% |
+> | Required | patch 85.0% |
+>
+> Nice jump! Every changed line that can be tested, is. 🎉
 
-## Status
+**Patch coverage** is computed from the PR diff automatically and only counts
+executable lines — comments and blank lines never drag it down. When a
+threshold fails, Covallaby tells you where to start
+(`Patch coverage is 72.0%, but 85.0% is required. 4 changed lines aren't
+covered yet — start with src/payment.ts:44-45`), never just "coverage failed."
 
-Early days — the CLI works today; the GitHub Action is next.
-
-- ✅ **Milestone 1** — workspace, CI, linting, tests
-- ✅ **Milestone 2** — coverage model, LCOV parser, CLI
-- ✅ **Milestone 3** — GitHub Action: sticky PR comments, patch coverage, thresholds, Step Summary
-- 🔜 **Milestone 4** — static HTML report
-- 🔜 **Milestone 5** — JaCoCo, Cobertura, and xccov parsers
+See [`examples/basic-workflow.yml`](examples/basic-workflow.yml) for a complete
+workflow and [`packages/github-action/action.yml`](packages/github-action/action.yml)
+for every input. (`covallaby/action@v1` arrives once the Action gets its own
+mirror repo.)
 
 ## CLI
 
+Everything the Action does works locally too:
+
 ```bash
-# Summarize coverage (human output; add --json for machines)
+# Summarize coverage (add --json for machines)
 covallaby report coverage/lcov.info
 
-# Gate CI on a threshold — failures explain what to do next, never just "failed"
+# Gate CI on a threshold
 covallaby check coverage/lcov.info --min-project 85
 
 # Sanity-check that a coverage file parses
@@ -45,32 +68,21 @@ covallaby validate coverage/lcov.info
 covallaby badge coverage/lcov.info -o coverage-badge.svg
 ```
 
-Multiple files are merged automatically (useful for test shards):
+Multiple files are merged automatically — handy for test shards:
 
 ```bash
 covallaby report shard-1/lcov.info shard-2/lcov.info
 ```
 
-## GitHub Action
+## Status
 
-```yaml
-- uses: covallaby/covallaby/packages/github-action@main
-  with:
-    files: coverage/lcov.info
-    min-patch: 85
-```
+Early days, moving in milestones. Each one leaves the repo releasable.
 
-One sticky PR comment. One Step Summary. One status check. Never spam.
-The comment is updated in place on every push — your PR never fills up with
-coverage noise. See [`examples/basic-workflow.yml`](examples/basic-workflow.yml)
-for a complete workflow, and [`packages/github-action/action.yml`](packages/github-action/action.yml)
-for every input. (`covallaby/action@v1` arrives once the action gets its own
-mirror repo.)
-
-**Patch coverage** — the number that answers "can I merge this?" — is computed
-from the PR diff automatically, and only counts executable lines: comments and
-blank lines never drag it down. Threshold failures tell you where to start,
-never just "coverage failed."
+- ✅ **Milestone 1** — workspace, CI, linting, tests
+- ✅ **Milestone 2** — coverage model, LCOV parser, CLI
+- ✅ **Milestone 3** — GitHub Action: sticky PR comments, patch coverage, thresholds, Step Summary
+- 🔜 **Milestone 4** — static HTML report (dark mode, searchable, no server)
+- 🔜 **Milestone 5** — JaCoCo, Cobertura, and xccov parsers
 
 ## Development
 
@@ -88,15 +100,16 @@ The repo is a pnpm workspace:
 | `@covallaby/core` | The shared coverage model, summaries, thresholds, badge |
 | `@covallaby/parsers` | Format parsers that normalize into the model |
 | `covallaby` | The CLI |
+| `@covallaby/github-action` | The Action |
 
-Design decisions live in [`docs/design/`](docs/design/). Product and brand
-guidance live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and [`docs/BRAND.md`](docs/BRAND.md).
+Design decisions live in [`docs/design/`](docs/design/). Brand assets and the
+brand guide live in [`brand/`](brand/).
 
 ## Philosophy
 
-- Beautiful by default. Zero config to start.
-- The GitHub Action is the product; a hosted service will only ever be a bonus.
-- Friendly language. Coverage tools should encourage, not shame.
+- **Beautiful by default.** Zero config to start; opinionated defaults everywhere.
+- **The GitHub Action is the product.** A hosted service will only ever be a bonus, never a requirement.
+- **Friendly, never shaming.** Coverage tools should point at the next step, not wag a finger.
 
 ## License
 
