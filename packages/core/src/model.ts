@@ -196,6 +196,8 @@ function mergeInto(target: FileCoverage, source: FileCoverage): void {
 /** True when every coverable unit in the counter was hit. */
 export function isFullyCovered(counter: Counter): boolean {
   return counter.total > 0 && counter.covered === counter.total;
+}
+
 /**
  * Roll file summaries up to their directory (the path's dirname), for
  * compact by-module breakdowns. Root-level files group under ".".
