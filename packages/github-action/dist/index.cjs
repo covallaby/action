@@ -26725,7 +26725,7 @@ function renderComment(input, maxRows = COMMENT_ROWS) {
   }
   lines.push(...renderBreakdown(summary2, patch, input.breakdown ?? "auto", maxRows));
   lines.push(
-    `<sub>${summary2.lines.covered} of ${summary2.lines.total} lines covered across ${summary2.totalFiles} files \xB7 [Covallaby](https://github.com/covallaby/covallaby)</sub>`
+    `<sub>${summary2.lines.covered} of ${summary2.lines.total} lines covered across ${summary2.totalFiles} files \xB7 [Covallaby](https://github.com/covallaby/action)</sub>`
   );
   return lines.join("\n");
 }

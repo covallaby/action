@@ -1,6 +1,6 @@
 # 🦘 Covallaby
 
-[![CI](https://github.com/covallaby/covallaby/actions/workflows/ci.yml/badge.svg)](https://github.com/covallaby/covallaby/actions/workflows/ci.yml)
+[![CI](https://github.com/covallaby/action/actions/workflows/ci.yml/badge.svg)](https://github.com/covallaby/action/actions/workflows/ci.yml)
 
 **Beautiful coverage reports for your pull requests.** No account, no upload
 token, no dashboard you didn't ask for — one workflow step, and every PR
@@ -24,13 +24,13 @@ The fastest way — paste this into your coding agent (Claude Code, Cursor,
 Copilot…) and it wires everything up for your stack, coverage file included:
 
 ```text
-Read https://raw.githubusercontent.com/covallaby/covallaby/main/llms-install.md and set up Covallaby in this repository.
+Read https://raw.githubusercontent.com/covallaby/action/main/llms-install.md and set up Covallaby in this repository.
 ```
 
 Or from a terminal with Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/covallaby/covallaby/main/llms-install.md | claude
+curl -fsSL https://raw.githubusercontent.com/covallaby/action/main/llms-install.md | claude
 ```
 
 [`llms-install.md`](llms-install.md) walks the agent through producing a
@@ -57,7 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm test -- --coverage # anything that writes a coverage file
-      - uses: covallaby/covallaby/packages/github-action@main
+      - uses: covallaby/action@main
         with:
           files: coverage/lcov.info
           min-patch: 85
@@ -78,9 +78,9 @@ That's the whole setup. Every PR then gets:
   covered yet — start with `src/payment.ts:44-45`"*), never just
   "coverage failed."
 
-See it live: [a passing PR](https://github.com/covallaby/covallaby/pull/1) ·
-[a failing PR](https://github.com/covallaby/covallaby/pull/2) ·
-[a docs-only PR](https://github.com/covallaby/covallaby/pull/3).
+See it live: [a passing PR](https://github.com/covallaby/action/pull/1) ·
+[a failing PR](https://github.com/covallaby/action/pull/2) ·
+[a docs-only PR](https://github.com/covallaby/action/pull/3).
 
 ## Producing a coverage file
 
@@ -254,7 +254,7 @@ pnpm verify   # lint + build + typecheck + test
 ## Coverage over time
 
 Want history, dashboards, and a live badge URL? Run the optional
-[**Covallaby server**](https://github.com/covallaby/server) — one tiny
+[**Covallaby server**](https://github.com/covallaby/covallaby) — one tiny
 self-hosted process (built-in SQLite or your Postgres), one `curl` from CI.
 The Action never requires it.
 

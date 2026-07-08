@@ -7,14 +7,17 @@ import { parse } from "yaml";
 // A malformed action.yml fails at runtime on every consumer's PR (an unquoted
 // "statuses: write" in a description once did exactly that), so the manifest
 // is validated here, before it can ship.
-const manifestPath = join(dirname(fileURLToPath(import.meta.url)), "..", "action.yml");
+const manifestPath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "action.yml");
 
 describe("action.yml", () => {
   const manifest = parse(readFileSync(manifestPath, "utf8"));
 
   it("parses and has the required top-level shape", () => {
     expect(manifest.name).toBe("Covallaby");
-    expect(manifest.runs).toEqual({ using: "node24", main: "dist/index.cjs" });
+    expect(manifest.runs).toEqual({
+      using: "node24",
+      main: "packages/github-action/dist/index.cjs",
+    });
   });
 
   it("declares every input the code reads, each with a string description", () => {

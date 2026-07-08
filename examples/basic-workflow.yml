@@ -20,7 +20,7 @@ jobs:
         run: npm test -- --coverage
 
       - name: Coverage report
-        uses: covallaby/covallaby/packages/github-action@main
+        uses: covallaby/action@main
         with:
           files: coverage/lcov.info
           min-patch: 85

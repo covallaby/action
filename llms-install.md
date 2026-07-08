@@ -68,7 +68,7 @@ jobs:
       - uses: actions/checkout@v4
       # …existing setup + test-with-coverage steps from TODO 1…
       - name: Coverage report
-        uses: covallaby/covallaby/packages/github-action@main
+        uses: covallaby/action@main
         with:
           files: <coverage file path from TODO 1>
           min-patch: 85

@@ -61,4 +61,4 @@ outputs:
 
 runs:
   using: node24
-  main: dist/index.cjs
+  main: packages/github-action/dist/index.cjs

@@ -45,7 +45,7 @@ jobs:
 
       # Dogfood: Covallaby reports on Covallaby.
       - name: Coverage report
-        uses: ./packages/github-action
+        uses: ./
         with:
           files: coverage/lcov.info
           min-project: 75

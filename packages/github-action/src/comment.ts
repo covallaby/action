@@ -90,7 +90,7 @@ export function renderComment(input: CommentInput, maxRows: number = COMMENT_ROW
   lines.push(...renderBreakdown(summary, patch, input.breakdown ?? "auto", maxRows));
 
   lines.push(
-    `<sub>${summary.lines.covered} of ${summary.lines.total} lines covered across ${summary.totalFiles} files · [Covallaby](https://github.com/covallaby/covallaby)</sub>`,
+    `<sub>${summary.lines.covered} of ${summary.lines.total} lines covered across ${summary.totalFiles} files · [Covallaby](https://github.com/covallaby/action)</sub>`,
   );
   return lines.join("\n");
 }
