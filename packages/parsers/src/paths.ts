@@ -11,5 +11,13 @@ export function normalizePath(raw: string, stripPrefix?: string): string {
       path = path.slice(prefix.length + 1);
     }
   }
-  return path.replace(/^\.\//, "");
+  path = path.replace(/^\.\//, "");
+  // Collapse `..` segments so a hostile coverage file can't reference paths
+  // outside the source root (arbitrary file read when the report is rendered).
+  const parts: string[] = [];
+  for (const segment of path.split("/")) {
+    if (segment === "..") parts.pop();
+    else if (segment !== "" && segment !== ".") parts.push(segment);
+  }
+  return parts.join("/");
 }

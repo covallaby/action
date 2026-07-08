@@ -21,3 +21,14 @@ describe("renderBadge", () => {
     expect(badgeColor(20)).toBe("#cf222e");
   });
 });
+
+describe("renderBadge security", () => {
+  it("escapes an untrusted label so it can't inject SVG markup", () => {
+    const svg = renderBadge(80, "</text></svg><script>alert(1)</script>");
+    expect(svg).not.toContain("<script>");
+    expect(svg).toContain("&lt;script&gt;");
+  });
+  it("caps label length", () => {
+    expect(renderBadge(80, "x".repeat(500))).toContain("x".repeat(64));
+  });
+});

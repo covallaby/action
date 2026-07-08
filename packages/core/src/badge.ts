@@ -9,11 +9,23 @@ export function badgeColor(percent: number | null): string {
   return "#cf222e";
 }
 
+/** Escape untrusted text before it enters SVG markup (labels are user-supplied). */
+function escapeXml(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
 /**
  * A flat, self-contained SVG coverage badge in the familiar shields style.
  * No network, no external fonts.
  */
-export function renderBadge(percent: number | null, label = "coverage"): string {
+export function renderBadge(percent: number | null, rawLabel = "coverage"): string {
+  // Cap and escape the label: it can arrive from an untrusted query string.
+  const label = escapeXml(rawLabel.slice(0, 64));
   const value = formatPercent(percent);
   const color = badgeColor(percent);
   // Verdana at 11px averages ~6.1px/char; shields.io uses the same trick.

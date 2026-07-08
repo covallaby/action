@@ -26123,7 +26123,7 @@ function rollupByDirectory(summary2, options = {}) {
 function formatPercent(value) {
   if (value === null)
     return "\u2014";
-  return `${(Math.floor(value * 10) / 10).toFixed(1)}%`;
+  return `${(Math.floor(value * 10 + 1e-9) / 10).toFixed(1)}%`;
 }
 function checkThresholds(summary2, thresholds, patch) {
   const failures = [];
@@ -26250,7 +26250,15 @@ function normalizePath(raw, stripPrefix) {
       path = path.slice(prefix.length + 1);
     }
   }
-  return path.replace(/^\.\//, "");
+  path = path.replace(/^\.\//, "");
+  const parts = [];
+  for (const segment of path.split("/")) {
+    if (segment === "..")
+      parts.pop();
+    else if (segment !== "" && segment !== ".")
+      parts.push(segment);
+  }
+  return parts.join("/");
 }
 
 // ../parsers/dist/lcov.js
@@ -26272,9 +26280,44 @@ function parseLcov(content, options = {}) {
     const lines = [...current.lines.entries()].map(([line, hits]) => ({ line, hits })).sort((a, b) => a.line - b.line);
     const functions = [...current.functionLines.entries()].map(([name, line]) => ({ name, line, hits: current.functionHits.get(name) ?? 0 })).sort((a, b) => a.line - b.line);
     const branches = [...current.branches.entries()].map(([line, b]) => ({ line, ...b })).sort((a, b) => a.line - b.line);
-    files.push({ path: current.path, lines, functions, branches });
+    const existing = byPath.get(current.path);
+    if (existing) {
+      const lineHits = new Map(existing.lines.map((l) => [l.line, l]));
+      for (const l of lines) {
+        const prev = lineHits.get(l.line);
+        if (prev)
+          prev.hits += l.hits;
+        else
+          existing.lines.push(l);
+      }
+      existing.lines.sort((a, b) => a.line - b.line);
+      const fnKey = (f) => `${f.name}@${f.line}`;
+      const fns = new Map(existing.functions.map((f) => [fnKey(f), f]));
+      for (const f of functions) {
+        const prev = fns.get(fnKey(f));
+        if (prev)
+          prev.hits += f.hits;
+        else
+          existing.functions.push(f);
+      }
+      const brs = new Map(existing.branches.map((b) => [b.line, b]));
+      for (const b of branches) {
+        const prev = brs.get(b.line);
+        if (prev) {
+          prev.taken = Math.max(prev.taken, b.taken);
+          prev.total = Math.max(prev.total, b.total);
+        } else
+          existing.branches.push(b);
+      }
+      existing.branches.sort((a, b) => a.line - b.line);
+    } else {
+      const file = { path: current.path, lines, functions, branches };
+      files.push(file);
+      byPath.set(current.path, file);
+    }
     current = null;
   };
+  const byPath = /* @__PURE__ */ new Map();
   const rows = content.split(/\r?\n/);
   for (let i = 0; i < rows.length; i++) {
     const lineNo = i + 1;
@@ -26583,7 +26626,8 @@ function parseXccov(content, options = {}) {
 
 // ../parsers/dist/index.js
 var COVERAGE_FORMATS = ["lcov", "jacoco", "cobertura", "xccov"];
-function detectFormat(content) {
+function detectFormat(raw) {
+  const content = raw.replace(/^\uFEFF/, "");
   if (/^(TN:|SF:)/m.test(content))
     return "lcov";
   if (/<report[\s>]/.test(content) && (/jacoco/i.test(content) || /<sourcefile[\s>]/.test(content))) {
@@ -26607,8 +26651,12 @@ function parseCoverage(content, options = {}) {
   if (format === null) {
     throw new ParseError(`Couldn't detect the coverage format. Covallaby understands ${COVERAGE_FORMATS.join(", ")} \u2014 pass --format to force one.`);
   }
+  const parser = parsers[format];
+  if (!parser) {
+    throw new ParseError(`Unknown format "${format}". Covallaby understands ${COVERAGE_FORMATS.join(", ")}.`);
+  }
   const stripPrefix = options.stripPrefix;
-  return parsers[format](content, stripPrefix === void 0 ? {} : { stripPrefix });
+  return parser(content, stripPrefix === void 0 ? {} : { stripPrefix });
 }
 
 // src/checks.ts
@@ -26667,6 +26715,9 @@ function buildAnnotations(patch, cap = ANNOTATION_CAP) {
 
 // src/comment.ts
 var COMMENT_MARKER = "<!-- covallaby-report:v1 -->";
+function codePath(path) {
+  return path.replaceAll("`", "'").replaceAll("|", "\\|").replace(/[\r\n]+/g, " ");
+}
 var COMMENT_ROWS = 20;
 var REPORT_PAGE_ROWS = 200;
 function headline({ result, patch, summary: summary2 }) {
@@ -26715,7 +26766,7 @@ function renderComment(input, maxRows = COMMENT_ROWS) {
     );
     lines.push("");
     for (const file of spots.slice(0, 10)) {
-      lines.push(`- \`${file.path}:${formatRanges(file.uncovered)}\``);
+      lines.push(`- \`${codePath(file.path)}:${formatRanges(file.uncovered)}\``);
     }
     if (spots.length > 10) lines.push(`- \u2026and ${spots.length - 10} more files`);
     lines.push("");
@@ -26741,7 +26792,7 @@ function renderBreakdown(summary2, patch, breakdown, maxRows) {
     lines.push("|---|---|---|");
     for (const f of rows.slice(0, maxRows)) {
       const missing = f.uncovered.length > 0 ? `\`${formatRanges(f.uncovered)}\`` : "\u2014";
-      lines.push(`| \`${f.path}\` | ${formatPercent(f.lines.percent)} | ${missing} |`);
+      lines.push(`| \`${codePath(f.path)}\` | ${formatPercent(f.lines.percent)} | ${missing} |`);
     }
     if (rows.length > maxRows) {
       lines.push(`| \u2026and ${rows.length - maxRows} more | | |`);
@@ -26763,7 +26814,7 @@ function renderBreakdown(summary2, patch, breakdown, maxRows) {
     lines.push("|---|---|---|");
     for (const d of dirs.slice(0, maxRows)) {
       lines.push(
-        `| \`${d.path}/\` | ${d.lines.covered}/${d.lines.total} | ${formatPercent(d.lines.percent)} |`
+        `| \`${codePath(d.path)}/\` | ${d.lines.covered}/${d.lines.total} | ${formatPercent(d.lines.percent)} |`
       );
     }
     if (dirs.length > maxRows) {
@@ -26891,6 +26942,19 @@ async function upsertComment(octokit, prNumber, body) {
     });
   }
 }
+function warnOnPathMismatch(report, changed, patch) {
+  if (patch.lines.total > 0) return;
+  if (report.files.length === 0 || changed.length === 0) return;
+  const reportPaths = new Set(report.files.map((f) => f.path));
+  const anyMatch = changed.some((c) => reportPaths.has(c.path));
+  if (anyMatch) return;
+  const sampleReport = report.files[0]?.path ?? "?";
+  const sampleDiff = changed[0]?.path ?? "?";
+  core.warning(
+    `Patch coverage is empty because none of the changed files matched the coverage report \u2014 this usually means the coverage paths aren't repo-relative. The report calls a file "${sampleReport}" while the PR changed "${sampleDiff}". Set \`strip-prefix\` (or, for JaCoCo/Cobertura, ensure the report emits repo-relative paths) so the two line up. Patch thresholds can't gate until they match.`,
+    { title: "Covallaby: coverage paths don't match the repo" }
+  );
+}
 async function run() {
   try {
     const inputs = parseInputs(
@@ -26911,6 +26975,7 @@ async function run() {
         const changed = await fetchChangedFiles(octokit, prNumber);
         patch = computePatchCoverage(report, changed);
         core.info(`Patch coverage: ${formatPercent(patch.lines.percent)}.`);
+        warnOnPathMismatch(report, changed, patch);
       } catch (error) {
         core.warning(
           `Couldn't read the PR diff (${error.message}); skipping patch coverage.`

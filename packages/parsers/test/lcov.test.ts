@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { summarize } from "@covallaby/core";
 import { describe, expect, it } from "vitest";
-import { ParseError, detectFormat, parseCoverage, parseLcov } from "../src/index.js";
+import { ParseError, detectFormat, normalizePath, parseCoverage, parseLcov } from "../src/index.js";
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "lcov");
 const fixture = (name: string) => readFileSync(join(fixturesDir, name), "utf8");
@@ -68,5 +68,29 @@ describe("detectFormat / parseCoverage", () => {
 
   it("gives a friendly error for unknown formats", () => {
     expect(() => parseCoverage("no format here")).toThrowError(/lcov, jacoco, cobertura, xccov/);
+  });
+});
+
+describe("normalizePath security", () => {
+  it("collapses .. so paths can't escape the root", () => {
+    expect(normalizePath("../../etc/passwd")).toBe("etc/passwd");
+    expect(normalizePath("src/../../../secret")).toBe("secret");
+    expect(normalizePath("a/b/../c")).toBe("a/c");
+  });
+});
+
+describe("lcov concatenated tracefiles", () => {
+  it("merges duplicate SF: sections instead of double-counting", () => {
+    const doc = "SF:a.ts\nDA:1,1\nDA:2,0\nend_of_record\nSF:a.ts\nDA:1,0\nDA:2,3\nend_of_record\n";
+    const report = parseLcov(doc);
+    expect(report.files).toHaveLength(1);
+    expect(report.files[0]!.lines).toEqual([
+      { line: 1, hits: 1 },
+      { line: 2, hits: 3 },
+    ]);
+  });
+
+  it("detects lcov despite a UTF-8 BOM", () => {
+    expect(detectFormat("\uFEFFSF:a.ts\nDA:1,1\nend_of_record")).toBe("lcov");
   });
 });

@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import type { ChangedFile, CoverageReport } from "@covallaby/core";
 
 /** Skip embedding sources bigger than this; the report degrades gracefully. */
@@ -19,8 +19,12 @@ export function buildPayload(
   options: { version: string; sourceRoot: string; patch?: ChangedFile[] },
 ): HtmlPayload {
   const sources: Record<string, string> = {};
+  const root = resolve(options.sourceRoot);
   for (const file of report.files) {
-    const full = resolve(options.sourceRoot, file.path);
+    const full = resolve(root, file.path);
+    // Defense in depth: never read outside the source root even if a path
+    // slipped past normalization (arbitrary file read from a hostile report).
+    if (full !== root && !full.startsWith(root + sep)) continue;
     try {
       if (statSync(full).size > MAX_SOURCE_BYTES) continue;
       sources[file.path] = readFileSync(full, "utf8");
@@ -47,7 +51,7 @@ export function injectPayload(template: string, payload: HtmlPayload): string {
     );
   }
   const json = JSON.stringify(payload).replaceAll("<", "\\u003c");
-  return template.replace(PLACEHOLDER, json);
+  return template.replace(PLACEHOLDER, () => json); // callback avoids $-pattern expansion
 }
 
 export function defaultTemplatePath(): string {

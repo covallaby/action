@@ -75,6 +75,33 @@ async function upsertComment(octokit: Octokit, prNumber: number, body: string): 
   }
 }
 
+/**
+ * The silent-churn guard. If the report has files and the PR changed files,
+ * but patch coverage saw zero coverable changed lines, the coverage paths
+ * almost certainly don't match the repo paths (JaCoCo package paths, Cobertura
+ * <sources>-relative names, a wrong strip-prefix). Without this, the gate
+ * quietly passes as if it were a docs-only PR.
+ */
+function warnOnPathMismatch(
+  report: CoverageReport,
+  changed: ChangedFile[],
+  patch: { lines: { total: number } },
+): void {
+  if (patch.lines.total > 0) return; // something matched — fine
+  if (report.files.length === 0 || changed.length === 0) return; // genuinely nothing to compare
+
+  const reportPaths = new Set(report.files.map((f) => f.path));
+  const anyMatch = changed.some((c) => reportPaths.has(c.path));
+  if (anyMatch) return; // paths line up; the PR just didn't touch coverable lines
+
+  const sampleReport = report.files[0]?.path ?? "?";
+  const sampleDiff = changed[0]?.path ?? "?";
+  core.warning(
+    `Patch coverage is empty because none of the changed files matched the coverage report — this usually means the coverage paths aren't repo-relative. The report calls a file "${sampleReport}" while the PR changed "${sampleDiff}". Set \`strip-prefix\` (or, for JaCoCo/Cobertura, ensure the report emits repo-relative paths) so the two line up. Patch thresholds can't gate until they match.`,
+    { title: "Covallaby: coverage paths don't match the repo" },
+  );
+}
+
 export async function run(): Promise<void> {
   try {
     const inputs = parseInputs(
@@ -99,6 +126,7 @@ export async function run(): Promise<void> {
         const changed = await fetchChangedFiles(octokit, prNumber);
         patch = computePatchCoverage(report, changed);
         core.info(`Patch coverage: ${formatPercent(patch.lines.percent)}.`);
+        warnOnPathMismatch(report, changed, patch);
       } catch (error) {
         core.warning(
           `Couldn't read the PR diff (${(error as Error).message}); skipping patch coverage.`,

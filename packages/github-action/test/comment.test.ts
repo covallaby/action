@@ -99,3 +99,21 @@ describe("parseInputs", () => {
     expect(() => parseInputs(raw({ files: " " }), "/w")).toThrowError(/`files` is required/);
   });
 });
+
+describe("renderComment path safety", () => {
+  it("neutralizes backticks and pipes in coverage file paths", () => {
+    const report = parseLcov("SF:evil`](http://x)|.ts\nDA:1,0\nDA:2,0\nend_of_record");
+    const summary = summarize(report);
+    const patch = computePatchCoverage(report, [
+      { path: "evil`](http://x)|.ts", added: false, lines: [1, 2] },
+    ]);
+    const comment = renderComment({
+      summary,
+      patch,
+      thresholds: { minPatch: 90 },
+      result: checkThresholds(summary, { minPatch: 90 }, patch),
+    });
+    expect(comment).not.toContain("`](http://x)");
+    expect(comment).not.toMatch(/\|.*evil/);
+  });
+});

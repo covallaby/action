@@ -10,6 +10,18 @@ import {
 
 export const COMMENT_MARKER = "<!-- covallaby-report:v1 -->";
 
+/**
+ * Make an untrusted file path safe inside a markdown inline-code span / table
+ * cell: backticks would break out of the span, pipes break the table, and
+ * newlines break the row. Coverage-file paths are attacker-controlled.
+ */
+function codePath(path: string): string {
+  return path
+    .replaceAll("`", "'")
+    .replaceAll("|", "\\|")
+    .replace(/[\r\n]+/g, " ");
+}
+
 export interface CommentInput {
   summary: ReportSummary;
   patch: PatchSummary | null;
@@ -78,7 +90,7 @@ export function renderComment(input: CommentInput, maxRows: number = COMMENT_ROW
     );
     lines.push("");
     for (const file of spots.slice(0, 10)) {
-      lines.push(`- \`${file.path}:${formatRanges(file.uncovered)}\``);
+      lines.push(`- \`${codePath(file.path)}:${formatRanges(file.uncovered)}\``);
     }
     if (spots.length > 10) lines.push(`- …and ${spots.length - 10} more files`);
     lines.push("");
@@ -114,7 +126,7 @@ function renderBreakdown(
     lines.push("|---|---|---|");
     for (const f of rows.slice(0, maxRows)) {
       const missing = f.uncovered.length > 0 ? `\`${formatRanges(f.uncovered)}\`` : "—";
-      lines.push(`| \`${f.path}\` | ${formatPercent(f.lines.percent)} | ${missing} |`);
+      lines.push(`| \`${codePath(f.path)}\` | ${formatPercent(f.lines.percent)} | ${missing} |`);
     }
     if (rows.length > maxRows) {
       lines.push(`| …and ${rows.length - maxRows} more | | |`);
@@ -138,7 +150,7 @@ function renderBreakdown(
     lines.push("|---|---|---|");
     for (const d of dirs.slice(0, maxRows)) {
       lines.push(
-        `| \`${d.path}/\` | ${d.lines.covered}/${d.lines.total} | ${formatPercent(d.lines.percent)} |`,
+        `| \`${codePath(d.path)}/\` | ${d.lines.covered}/${d.lines.total} | ${formatPercent(d.lines.percent)} |`,
       );
     }
     if (dirs.length > maxRows) {

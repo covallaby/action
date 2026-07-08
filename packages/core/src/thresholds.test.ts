@@ -85,3 +85,10 @@ describe("checkThresholds with patch coverage", () => {
     expect(checkThresholds(summary, { minNewFile: 90 }, patch(60, false)).ok).toBe(true);
   });
 });
+
+describe("formatPercent floating-point", () => {
+  it("does not floor exact percentages a tenth low", () => {
+    expect(formatPercent((29 / 100) * 100)).toBe("29.0%"); // 28.999… must not become 28.9
+    expect(formatPercent((23 / 40) * 100)).toBe("57.5%");
+  });
+});
