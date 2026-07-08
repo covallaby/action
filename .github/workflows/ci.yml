@@ -12,6 +12,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      statuses: write # covallaby/project + covallaby/patch named checks
     steps:
       - uses: actions/checkout@v4
 
