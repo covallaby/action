@@ -51,6 +51,14 @@ jobs:
           min-project: 75
           min-patch: 80
 
+      # …and upload to our hosted instance so it shows in the covallaby.com dashboard.
+      - name: Upload coverage to Covallaby (hosted)
+        if: github.event_name == 'push'
+        run: |
+          curl -sf -X POST "https://app.covallaby.com/api/v1/upload?repo=${{ github.repository }}&branch=${{ github.ref_name }}&commit=${{ github.sha }}" \
+            -H "Authorization: Bearer ${{ secrets.COVALLABY_TOKEN }}" \
+            --data-binary @coverage/lcov.info
+
       - name: HTML report
         run: node packages/cli/dist/bin.js html coverage/lcov.info --strip-prefix "$PWD" -o covallaby-report
 
