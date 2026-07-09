@@ -26262,6 +26262,39 @@ function parseHunks(patch) {
   return lines;
 }
 
+// ../core/dist/ignore.js
+function pathMatcher(pattern) {
+  const p = pattern.trim().replace(/^\.?\//, "").replace(/\/+$/, "");
+  let rx = "";
+  for (let i = 0; i < p.length; i++) {
+    const c = p[i];
+    if (c === "*" && p[i + 1] === "*") {
+      if (p[i + 2] === "/") {
+        rx += "(?:.*/)?";
+        i += 2;
+      } else {
+        rx += ".*";
+        i += 1;
+      }
+    } else if (c === "*") {
+      rx += "[^/]*";
+    } else if (c === "?") {
+      rx += "[^/]";
+    } else {
+      rx += c.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+    }
+  }
+  const body = p.includes("/") ? `^${rx}(?:/.*)?$` : `(?:^|.*/)${rx}(?:/.*)?$`;
+  return new RegExp(body);
+}
+function ignorePaths(report, patterns) {
+  const active = patterns.map((p) => p.trim()).filter(Boolean);
+  if (active.length === 0)
+    return report;
+  const matchers = active.map(pathMatcher);
+  return { files: report.files.filter((f) => !matchers.some((m) => m.test(f.path))) };
+}
+
 // ../parsers/dist/paths.js
 function normalizePath(raw, stripPrefix) {
   let path = raw.trim().replaceAll("\\", "/");
@@ -26903,8 +26936,10 @@ function parseInputs(raw, workspace) {
   if (minProject !== void 0) thresholds.minProject = minProject;
   if (minPatch !== void 0) thresholds.minPatch = minPatch;
   if (minNewFile !== void 0) thresholds.minNewFile = minNewFile;
+  const ignore = raw.getInput("ignore").split(/[\n,]/).map((p) => p.trim()).filter((p) => p !== "");
   return {
     files,
+    ignore,
     ...format !== "" && { format },
     stripPrefix: raw.getInput("strip-prefix").trim() || workspace,
     thresholds,
@@ -26986,7 +27021,10 @@ async function run() {
       { getInput: (name) => core.getInput(name) },
       process.env.GITHUB_WORKSPACE ?? process.cwd()
     );
-    const report = loadReport(inputs.files, inputs.format, inputs.stripPrefix);
+    const report = ignorePaths(
+      loadReport(inputs.files, inputs.format, inputs.stripPrefix),
+      inputs.ignore
+    );
     const summary2 = summarize(report);
     const fileWord = inputs.files.length === 1 ? "file" : "files";
     core.info(
