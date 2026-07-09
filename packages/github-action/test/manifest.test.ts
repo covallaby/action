@@ -24,6 +24,7 @@ describe("action.yml", () => {
     const expected = [
       "files",
       "format",
+      "ignore",
       "strip-prefix",
       "min-project",
       "min-patch",

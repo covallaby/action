@@ -3,6 +3,7 @@ import { COVERAGE_FORMATS, type CoverageFormat } from "@covallaby/parsers";
 
 export interface ActionInputs {
   files: string[];
+  ignore: string[];
   format?: CoverageFormat;
   stripPrefix: string;
   thresholds: Thresholds;
@@ -76,8 +77,15 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
   if (minPatch !== undefined) thresholds.minPatch = minPatch;
   if (minNewFile !== undefined) thresholds.minNewFile = minNewFile;
 
+  const ignore = raw
+    .getInput("ignore")
+    .split(/[\n,]/)
+    .map((p) => p.trim())
+    .filter((p) => p !== "");
+
   return {
     files,
+    ignore,
     ...(format !== "" && { format: format as CoverageFormat }),
     stripPrefix: raw.getInput("strip-prefix").trim() || workspace,
     thresholds,

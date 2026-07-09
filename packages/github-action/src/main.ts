@@ -7,6 +7,7 @@ import {
   checkThresholds,
   computePatchCoverage,
   formatPercent,
+  ignorePaths,
   matchCoveragePaths,
   mergeReports,
   parseHunks,
@@ -114,7 +115,10 @@ export async function run(): Promise<void> {
       process.env.GITHUB_WORKSPACE ?? process.cwd(),
     );
 
-    const report = loadReport(inputs.files, inputs.format, inputs.stripPrefix);
+    const report = ignorePaths(
+      loadReport(inputs.files, inputs.format, inputs.stripPrefix),
+      inputs.ignore,
+    );
     const summary = summarize(report);
     const fileWord = inputs.files.length === 1 ? "file" : "files";
     core.info(

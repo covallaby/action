@@ -12,6 +12,9 @@ inputs:
   format:
     description: "Coverage format (default: auto-detect). Supported: lcov, jacoco, cobertura, xccov."
     required: false
+  ignore:
+    description: Paths to exclude from coverage, newline- or comma-separated gitignore-style globs (e.g. "**/*.gen.ts", "node_modules", "tests/**").
+    required: false
   strip-prefix:
     description: Path prefix to strip so file paths are repo-relative. Defaults to the workspace directory.
     required: false
