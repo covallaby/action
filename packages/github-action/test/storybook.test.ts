@@ -78,4 +78,65 @@ describe("Storybook preview upload", () => {
       }),
     ).rejects.toThrow("does not contain index.html");
   });
+
+  it("reports manifest, upload-map, object, and completion failures clearly", async () => {
+    const root = await mkdtemp(join(tmpdir(), "covallaby-storybook-"));
+    await writeFile(join(root, "index.html"), "<h1>Storybook</h1>");
+    const options = {
+      serverUrl: "https://app.example",
+      token: "secret",
+      directory: root,
+      repo: "acme/app",
+      branch: "main",
+      commit: "abc",
+      pr: null,
+    };
+    await expect(
+      uploadStorybookPreview({
+        ...options,
+        fetch: async () => new Response("denied", { status: 401 }),
+      }),
+    ).rejects.toThrow("Storybook manifest failed (401)");
+
+    await expect(
+      uploadStorybookPreview({
+        ...options,
+        fetch: async () => Response.json({ run: { id: 1 }, artifacts: [], url: "/preview/1" }),
+      }),
+    ).rejects.toThrow("0 upload URLs for 1 Storybook files");
+
+    const manifest = (path = "index.html") => ({
+      run: { id: 1 },
+      artifacts: [{ path, uploadUrl: "https://objects.example/index.html" }],
+      url: "/preview/1",
+    });
+    await expect(
+      uploadStorybookPreview({
+        ...options,
+        fetch: async () => Response.json(manifest("wrong.html")),
+      }),
+    ).rejects.toThrow("upload URL for the wrong file");
+
+    await expect(
+      uploadStorybookPreview({
+        ...options,
+        fetch: async (input) =>
+          String(input).endsWith("/api/v1/storybook-previews")
+            ? Response.json(manifest())
+            : new Response("storage down", { status: 500 }),
+      }),
+    ).rejects.toThrow("Uploading Storybook file index.html failed (500)");
+
+    await expect(
+      uploadStorybookPreview({
+        ...options,
+        fetch: async (input) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/storybook-previews")) return Response.json(manifest());
+          if (url.endsWith("/complete")) return new Response("missing", { status: 409 });
+          return new Response(null, { status: 200 });
+        },
+      }),
+    ).rejects.toThrow("Completing Covallaby Storybook preview failed (409)");
+  });
 });
