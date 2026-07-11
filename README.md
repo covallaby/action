@@ -222,6 +222,7 @@ Then extend the normal Action step:
 
 ```yaml
 - uses: covallaby/action@main
+  if: always() # preserve the recording when Playwright fails
   with:
     files: coverage/lcov.info
     server-url: https://app.covallaby.com
@@ -233,6 +234,30 @@ Then extend the normal Action step:
 The Action posts a playback link in the Step Summary and exposes it as
 `playback-url`. Videos and traces upload directly to private object storage via
 short-lived signed URLs; the Action does not send them through the app server.
+Keep `if: always()` on this step: without it, GitHub skips the upload after a
+failed browser test, which is precisely when the recording and trace are most
+useful. Covallaby still fails clearly if the expected JSON report was never
+created.
+
+## Storybook previews
+
+Build Storybook in CI, then point the same Action step at its static output:
+
+```yaml
+- run: npm run build-storybook
+- uses: covallaby/action@main
+  if: always()
+  with:
+    files: coverage/lcov.info
+    server-url: https://app.covallaby.com
+    server-token: ${{ secrets.COVALLABY_TOKEN }}
+    storybook-dir: storybook-static
+```
+
+Covallaby uploads the files directly to private object storage and adds an
+isolated, interactive Storybook preview to its sticky PR comment, Step Summary,
+and dashboard. The server must configure a separate `COVALLABY_PREVIEW_BASE_URL`
+origin so repository-controlled preview code never runs with dashboard access.
 
 ## CLI
 
