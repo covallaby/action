@@ -196,10 +196,43 @@ Multiple files merge automatically (test shards, mixed suites):
 | `annotations` | Warnings on uncovered changed lines in the diff. | `true` |
 | `statuses` | `covallaby/project` + `covallaby/patch` commit statuses. | `true` |
 | `github-token` | Token for comments/checks/statuses. | `github.token` |
+| `server-url` | Covallaby server used for browser-run playback uploads. | off |
+| `server-token` | Per-repo or admin upload token for that server. | off |
+| `playwright-results` | Playwright JSON reporter output; enables browser playbacks. | off |
+| `playwright-artifacts` | Extra files/directories such as `test-results`. | off |
 
 </details>
 
 Outputs: `project-coverage`, `patch-coverage`, `uncovered-lines`, `ok`.
+
+## Playwright videos, screenshots, and traces
+
+Covallaby can turn CI's Playwright output into a visual playback page. Keep the
+JSON reporter alongside your preferred reporter:
+
+```ts
+// playwright.config.ts
+export default defineConfig({
+  reporter: [["json", { outputFile: "playwright-results.json" }], ["html"]],
+  use: { video: "on", trace: "retain-on-failure", screenshot: "only-on-failure" },
+});
+```
+
+Then extend the normal Action step:
+
+```yaml
+- uses: covallaby/action@main
+  with:
+    files: coverage/lcov.info
+    server-url: https://app.covallaby.com
+    server-token: ${{ secrets.COVALLABY_TOKEN }}
+    playwright-results: playwright-results.json
+    playwright-artifacts: test-results
+```
+
+The Action posts a playback link in the Step Summary and exposes it as
+`playback-url`. Videos and traces upload directly to private object storage via
+short-lived signed URLs; the Action does not send them through the app server.
 
 ## CLI
 

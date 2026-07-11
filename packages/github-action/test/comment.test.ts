@@ -70,6 +70,18 @@ describe("renderComment", () => {
   it("omits the marker from the step summary", () => {
     expect(renderStepSummary(build({}))).not.toContain(COMMENT_MARKER);
   });
+
+  it("links the hosted browser playback from the sticky comment", () => {
+    const comment = renderComment({
+      ...build({}),
+      playback: { url: "https://app.covallaby.com/r/acme/app/test-runs/42", artifacts: 7 },
+    });
+    expect(comment).toContain("### Browser playback");
+    expect(comment).toContain(
+      "[Watch this run in Covallaby](https://app.covallaby.com/r/acme/app/test-runs/42)",
+    );
+    expect(comment).toContain("7 artifacts");
+  });
 });
 
 describe("parseInputs", () => {
@@ -97,6 +109,23 @@ describe("parseInputs", () => {
       /understands: lcov, jacoco, cobertura, xccov/,
     );
     expect(() => parseInputs(raw({ files: " " }), "/w")).toThrowError(/`files` is required/);
+  });
+
+  it("parses hosted Playwright inputs without retaining a trailing slash", () => {
+    const inputs = parseInputs(
+      raw({
+        files: "coverage.info",
+        "server-url": "https://app.covallaby.com///",
+        "server-token": " secret ",
+        "playwright-results": " results.json ",
+        "playwright-artifacts": "test-results, playwright-report\ntrace.zip",
+      }),
+      "/w",
+    );
+    expect(inputs.serverUrl).toBe("https://app.covallaby.com");
+    expect(inputs.serverToken).toBe("secret");
+    expect(inputs.playwrightResults).toBe("results.json");
+    expect(inputs.playwrightArtifacts).toEqual(["test-results", "playwright-report", "trace.zip"]);
   });
 });
 

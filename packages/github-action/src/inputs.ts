@@ -13,6 +13,10 @@ export interface ActionInputs {
   breakdown: number | "auto" | "off";
   statuses: boolean;
   githubToken: string;
+  serverUrl?: string;
+  serverToken?: string;
+  playwrightResults?: string;
+  playwrightArtifacts: string[];
 }
 
 export interface RawInputs {
@@ -95,5 +99,19 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
     annotations: parseSwitch(raw.getInput("annotations"), "annotations", true),
     statuses: parseSwitch(raw.getInput("statuses"), "statuses", true),
     githubToken: raw.getInput("github-token"),
+    ...(raw.getInput("server-url").trim() && {
+      serverUrl: raw.getInput("server-url").trim().replace(/\/+$/, ""),
+    }),
+    ...(raw.getInput("server-token").trim() && {
+      serverToken: raw.getInput("server-token").trim(),
+    }),
+    ...(raw.getInput("playwright-results").trim() && {
+      playwrightResults: raw.getInput("playwright-results").trim(),
+    }),
+    playwrightArtifacts: raw
+      .getInput("playwright-artifacts")
+      .split(/[\n,]/)
+      .map((p) => p.trim())
+      .filter(Boolean),
   };
 }

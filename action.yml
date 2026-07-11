@@ -51,6 +51,18 @@ inputs:
     description: Token used to read the PR diff and post the sticky comment.
     required: false
     default: ${{ github.token }}
+  server-url:
+    description: Covallaby server URL. Required only when uploading Playwright results.
+    required: false
+  server-token:
+    description: Covallaby upload token. Required only when uploading Playwright results.
+    required: false
+  playwright-results:
+    description: Playwright JSON reporter output. Enables browser-run playback uploads.
+    required: false
+  playwright-artifacts:
+    description: Additional Playwright files or directories to upload, comma- or newline-separated.
+    required: false
 
 outputs:
   project-coverage:
@@ -61,6 +73,8 @@ outputs:
     description: Number of uncovered lines in the project.
   ok:
     description: "'true' when every configured threshold passed."
+  playback-url:
+    description: Hosted URL for the uploaded Playwright browser run, or empty when disabled.
 
 runs:
   using: node24
