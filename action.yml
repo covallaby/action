@@ -52,10 +52,10 @@ inputs:
     required: false
     default: ${{ github.token }}
   server-url:
-    description: Covallaby server URL. Required only when uploading Playwright results.
+    description: Covallaby server URL. Required when uploading Playwright results or Storybook previews.
     required: false
   server-token:
-    description: Covallaby upload token. Required only when uploading Playwright results.
+    description: Covallaby upload token. Required when uploading Playwright results or Storybook previews.
     required: false
   playwright-results:
     description: Playwright JSON reporter output. Enables browser-run playback uploads.
