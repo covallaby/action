@@ -1,6 +1,6 @@
 import { createReadStream } from "node:fs";
-import { readFile, readdir, stat } from "node:fs/promises";
-import { basename, extname, resolve } from "node:path";
+import { readFile, readdir, realpath, stat } from "node:fs/promises";
+import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path";
 
 export interface PlaybackOptions {
   serverUrl: string;
@@ -67,11 +67,23 @@ const kindOf = (path: string): string => {
   return "other";
 };
 
-async function filesUnder(path: string): Promise<string[]> {
-  const info = await stat(path);
-  if (info.isFile()) return [path];
-  const entries = await readdir(path, { withFileTypes: true });
-  const nested = await Promise.all(entries.map((entry) => filesUnder(resolve(path, entry.name))));
+const isWithin = (path: string, root: string): boolean => {
+  const fromRoot = relative(root, path);
+  return (
+    fromRoot === "" ||
+    (fromRoot !== ".." && !fromRoot.startsWith(`..${sep}`) && !isAbsolute(fromRoot))
+  );
+};
+
+async function filesUnder(path: string, root = path): Promise<string[]> {
+  const actual = await realpath(path);
+  if (!isWithin(actual, root)) return [];
+  const info = await stat(actual);
+  if (info.isFile()) return [actual];
+  const entries = await readdir(actual, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map((entry) => filesUnder(resolve(actual, entry.name), root)),
+  );
   return nested.flat();
 }
 
@@ -116,10 +128,21 @@ export async function uploadPlaywrightRun(
   const resultsPath = resolve(options.resultsPath);
   const results = JSON.parse(await readFile(resultsPath, "utf8")) as PlaywrightJson;
   const meta = testMetadata(results);
-  const discovered = new Set<string>([resultsPath]);
-  for (const path of options.artifactPaths)
-    for (const file of await filesUnder(resolve(path))) discovered.add(file);
-  for (const path of meta.names.keys()) discovered.add(path);
+  const discovered = new Set<string>([await realpath(resultsPath)]);
+  const roots = await Promise.all(options.artifactPaths.map((path) => realpath(resolve(path))));
+  for (const root of roots) for (const file of await filesUnder(root)) discovered.add(file);
+  const attachmentNames = new Map<string, string>();
+  for (const [path, testName] of meta.names) {
+    try {
+      const actual = await realpath(path);
+      if (roots.some((root) => isWithin(actual, root))) {
+        discovered.add(actual);
+        attachmentNames.set(actual, testName);
+      }
+    } catch {
+      // Missing attachments are not useful artifacts and should not fail the run.
+    }
+  }
   const files: ArtifactFile[] = [];
   for (const path of discovered) {
     const info = await stat(path);
@@ -129,7 +152,7 @@ export async function uploadPlaywrightRun(
       kind: kindOf(path),
       contentType: MIME[extname(path).toLowerCase()] ?? "application/octet-stream",
       sizeBytes: info.size,
-      testName: meta.names.get(path) ?? null,
+      testName: attachmentNames.get(path) ?? meta.names.get(path) ?? null,
     });
   }
   const auth = { authorization: `Bearer ${options.token}` };
@@ -158,12 +181,19 @@ export async function uploadPlaywrightRun(
     artifacts: Array<{ uploadUrl: string }>;
     url: string;
   };
+  if (manifest.artifacts.length !== files.length) {
+    throw new Error(
+      `Covallaby returned ${manifest.artifacts.length} upload URLs for ${files.length} artifacts.`,
+    );
+  }
+  const serverOrigin = new URL(options.serverUrl).origin;
   for (let start = 0; start < files.length; start += 4) {
     await Promise.all(
       files.slice(start, start + 4).map(async (file, offset) => {
         const target = manifest.artifacts[start + offset]!;
-        const localUpload = target.uploadUrl.startsWith(options.serverUrl);
-        const uploaded = await fetcher(target.uploadUrl, {
+        const targetUrl = new URL(target.uploadUrl, `${options.serverUrl}/`);
+        const localUpload = targetUrl.origin === serverOrigin;
+        const uploaded = await fetcher(targetUrl.toString(), {
           method: "PUT",
           headers: {
             "content-type": file.contentType,

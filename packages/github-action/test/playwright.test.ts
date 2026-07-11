@@ -119,6 +119,93 @@ describe("Playwright playback upload", () => {
     ).rejects.toThrow("manifest failed (401)");
   });
 
+  it("does not discover attachments outside configured roots or leak tokens across origins", async () => {
+    const root = await mkdtemp(join(tmpdir(), "covallaby-playwright-root-"));
+    const outside = await mkdtemp(join(tmpdir(), "covallaby-playwright-outside-"));
+    const secretFile = join(outside, "secret.txt");
+    const allowedFile = join(root, "notes.txt");
+    const results = join(root, "results.json");
+    await writeFile(secretFile, "runner secret");
+    await writeFile(allowedFile, "safe artifact");
+    await writeFile(
+      results,
+      JSON.stringify({
+        suites: [
+          {
+            specs: [
+              {
+                title: "untrusted attachment",
+                tests: [
+                  {
+                    results: [{ status: "passed", attachments: [{ path: secretFile }] }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const calls: Array<{ url: string; authorization?: string }> = [];
+    await uploadPlaywrightRun({
+      serverUrl: "https://app.example",
+      token: "must-not-leak",
+      resultsPath: results,
+      artifactPaths: [root],
+      repo: "acme/app",
+      branch: "main",
+      commit: "abc",
+      pr: 1,
+      fetch: (async (input, init = {}) => {
+        const url = String(input);
+        calls.push({
+          url,
+          authorization: (init.headers as Record<string, string> | undefined)?.authorization,
+        });
+        if (url.endsWith("/api/v1/test-runs")) {
+          const body = JSON.parse(String(init.body)) as { artifacts: Array<{ name: string }> };
+          expect(body.artifacts.map((artifact) => artifact.name)).toEqual([
+            "results.json",
+            "notes.txt",
+          ]);
+          return Response.json({
+            run: { id: 4 },
+            artifacts: [
+              { uploadUrl: "https://app.example.evil.test/steal" },
+              { uploadUrl: "/local-upload" },
+            ],
+            url: "/run/4",
+          });
+        }
+        return new Response(null, { status: 200 });
+      }) as typeof fetch,
+    });
+    const hostileUpload = calls.find((call) => call.url.includes("evil.test"));
+    expect(hostileUpload?.authorization).toBeUndefined();
+    const localUpload = calls.find((call) => call.url === "https://app.example/local-upload");
+    expect(localUpload?.authorization).toBe("Bearer must-not-leak");
+  });
+
+  it("rejects a manifest with the wrong number of upload URLs", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "covallaby-playwright-"));
+    const results = join(dir, "results.json");
+    await writeFile(results, JSON.stringify({ suites: [] }));
+    await expect(
+      uploadPlaywrightRun({
+        serverUrl: "https://app.example",
+        token: "secret",
+        resultsPath: results,
+        artifactPaths: [],
+        repo: "acme/app",
+        branch: "main",
+        commit: "abc",
+        pr: null,
+        fetch: async () =>
+          Response.json({ run: { id: 1 }, artifacts: [], url: "/run/1" }, { status: 201 }),
+      }),
+    ).rejects.toThrow("0 upload URLs for 1 artifacts");
+  });
+
   it("surfaces object upload and completion failures", async () => {
     const dir = await mkdtemp(join(tmpdir(), "covallaby-playwright-"));
     const results = join(dir, "results.json");

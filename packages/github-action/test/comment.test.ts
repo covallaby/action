@@ -115,7 +115,7 @@ describe("parseInputs", () => {
     const inputs = parseInputs(
       raw({
         files: "coverage.info",
-        "server-url": "https://app.covallaby.com/",
+        "server-url": "https://app.covallaby.com///",
         "server-token": " secret ",
         "playwright-results": " results.json ",
         "playwright-artifacts": "test-results, playwright-report\ntrace.zip",

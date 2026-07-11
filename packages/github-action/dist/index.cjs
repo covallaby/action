@@ -26958,7 +26958,7 @@ function parseInputs(raw, workspace) {
     statuses: parseSwitch(raw.getInput("statuses"), "statuses", true),
     githubToken: raw.getInput("github-token"),
     ...raw.getInput("server-url").trim() && {
-      serverUrl: raw.getInput("server-url").trim().replace(/\/$/, "")
+      serverUrl: raw.getInput("server-url").trim().replace(/\/+$/, "")
     },
     ...raw.getInput("server-token").trim() && {
       serverToken: raw.getInput("server-token").trim()
@@ -26993,11 +26993,19 @@ var kindOf = (path) => {
   if (ext === ".json") return "results";
   return "other";
 };
-async function filesUnder(path) {
-  const info2 = await (0, import_promises.stat)(path);
-  if (info2.isFile()) return [path];
-  const entries = await (0, import_promises.readdir)(path, { withFileTypes: true });
-  const nested = await Promise.all(entries.map((entry) => filesUnder((0, import_node_path.resolve)(path, entry.name))));
+var isWithin = (path, root) => {
+  const fromRoot = (0, import_node_path.relative)(root, path);
+  return fromRoot === "" || fromRoot !== ".." && !fromRoot.startsWith(`..${import_node_path.sep}`) && !(0, import_node_path.isAbsolute)(fromRoot);
+};
+async function filesUnder(path, root = path) {
+  const actual = await (0, import_promises.realpath)(path);
+  if (!isWithin(actual, root)) return [];
+  const info2 = await (0, import_promises.stat)(actual);
+  if (info2.isFile()) return [actual];
+  const entries = await (0, import_promises.readdir)(actual, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map((entry) => filesUnder((0, import_node_path.resolve)(actual, entry.name), root))
+  );
   return nested.flat();
 }
 function testMetadata(json) {
@@ -27032,10 +27040,20 @@ async function uploadPlaywrightRun(options) {
   const resultsPath = (0, import_node_path.resolve)(options.resultsPath);
   const results = JSON.parse(await (0, import_promises.readFile)(resultsPath, "utf8"));
   const meta = testMetadata(results);
-  const discovered = /* @__PURE__ */ new Set([resultsPath]);
-  for (const path of options.artifactPaths)
-    for (const file of await filesUnder((0, import_node_path.resolve)(path))) discovered.add(file);
-  for (const path of meta.names.keys()) discovered.add(path);
+  const discovered = /* @__PURE__ */ new Set([await (0, import_promises.realpath)(resultsPath)]);
+  const roots = await Promise.all(options.artifactPaths.map((path) => (0, import_promises.realpath)((0, import_node_path.resolve)(path))));
+  for (const root of roots) for (const file of await filesUnder(root)) discovered.add(file);
+  const attachmentNames = /* @__PURE__ */ new Map();
+  for (const [path, testName] of meta.names) {
+    try {
+      const actual = await (0, import_promises.realpath)(path);
+      if (roots.some((root) => isWithin(actual, root))) {
+        discovered.add(actual);
+        attachmentNames.set(actual, testName);
+      }
+    } catch {
+    }
+  }
   const files = [];
   for (const path of discovered) {
     const info2 = await (0, import_promises.stat)(path);
@@ -27045,7 +27063,7 @@ async function uploadPlaywrightRun(options) {
       kind: kindOf(path),
       contentType: MIME[(0, import_node_path.extname)(path).toLowerCase()] ?? "application/octet-stream",
       sizeBytes: info2.size,
-      testName: meta.names.get(path) ?? null
+      testName: attachmentNames.get(path) ?? meta.names.get(path) ?? null
     });
   }
   const auth = { authorization: `Bearer ${options.token}` };
@@ -27070,12 +27088,19 @@ async function uploadPlaywrightRun(options) {
       `Covallaby playback manifest failed (${created.status}): ${await created.text()}`
     );
   const manifest = await created.json();
+  if (manifest.artifacts.length !== files.length) {
+    throw new Error(
+      `Covallaby returned ${manifest.artifacts.length} upload URLs for ${files.length} artifacts.`
+    );
+  }
+  const serverOrigin = new URL(options.serverUrl).origin;
   for (let start = 0; start < files.length; start += 4) {
     await Promise.all(
       files.slice(start, start + 4).map(async (file, offset) => {
         const target = manifest.artifacts[start + offset];
-        const localUpload = target.uploadUrl.startsWith(options.serverUrl);
-        const uploaded = await fetcher(target.uploadUrl, {
+        const targetUrl = new URL(target.uploadUrl, `${options.serverUrl}/`);
+        const localUpload = targetUrl.origin === serverOrigin;
+        const uploaded = await fetcher(targetUrl.toString(), {
           method: "PUT",
           headers: {
             "content-type": file.contentType,

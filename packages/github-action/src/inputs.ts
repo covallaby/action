@@ -100,7 +100,7 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
     statuses: parseSwitch(raw.getInput("statuses"), "statuses", true),
     githubToken: raw.getInput("github-token"),
     ...(raw.getInput("server-url").trim() && {
-      serverUrl: raw.getInput("server-url").trim().replace(/\/$/, ""),
+      serverUrl: raw.getInput("server-url").trim().replace(/\/+$/, ""),
     }),
     ...(raw.getInput("server-token").trim() && {
       serverToken: raw.getInput("server-token").trim(),
