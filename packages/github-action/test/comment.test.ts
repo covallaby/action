@@ -71,6 +71,16 @@ describe("renderComment", () => {
     expect(renderStepSummary(build({}))).not.toContain(COMMENT_MARKER);
   });
 
+  it("keeps visual testing links before the report footer", () => {
+    const summary = renderStepSummary({
+      ...build({}),
+      playback: { url: "https://app.example/playback/42", artifacts: 7 },
+      storybook: { url: "https://app.example/storybook/8", files: 30 },
+    });
+    expect(summary.indexOf("### Browser playback")).toBeLessThan(summary.indexOf("### Storybook"));
+    expect(summary.indexOf("### Storybook")).toBeLessThan(summary.indexOf("<sub>"));
+  });
+
   it("links the hosted browser playback from the sticky comment", () => {
     const comment = renderComment({
       ...build({}),
