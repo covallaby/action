@@ -8,8 +8,10 @@ describe("Playwright playback upload", () => {
   it("keeps test names attached and uploads directly to signed storage", async () => {
     const dir = await mkdtemp(join(tmpdir(), "covallaby-playwright-"));
     const video = join(dir, "checkout.webm");
+    const notes = join(dir, "notes.txt");
     const results = join(dir, "results.json");
     await writeFile(video, "video-bytes");
+    await writeFile(notes, "debug notes");
     await writeFile(
       results,
       JSON.stringify({
@@ -32,6 +34,11 @@ describe("Playwright playback upload", () => {
                   },
                 ],
               },
+              {
+                title: "skips a browser",
+                tests: [{ results: [{ status: "skipped", duration: 0 }] }],
+              },
+              { title: "fails before launch", tests: [{ results: [] }] },
             ],
           },
         ],
@@ -45,10 +52,14 @@ describe("Playwright playback upload", () => {
       if (url.endsWith("/api/v1/test-runs")) {
         const body = JSON.parse(String(init.body)) as {
           testsPassed: number;
+          testsFailed: number;
+          testsSkipped: number;
           durationMs: number;
           artifacts: Array<{ kind: string; testName: string | null }>;
         };
         expect(body.testsPassed).toBe(1);
+        expect(body.testsSkipped).toBe(1);
+        expect(body.testsFailed).toBe(1);
         expect(body.durationMs).toBe(1334);
         expect(body.artifacts.find((a) => a.kind === "video")?.testName).toContain("buys a plan");
         return Response.json(
@@ -70,7 +81,7 @@ describe("Playwright playback upload", () => {
       serverUrl: "https://app.example",
       token: "secret",
       resultsPath: results,
-      artifactPaths: [],
+      artifactPaths: [dir],
       repo: "acme/app",
       branch: "feature",
       commit: "abc",
@@ -80,10 +91,10 @@ describe("Playwright playback upload", () => {
     expect(uploaded).toEqual({
       id: 42,
       url: "https://app.example/r/acme/app/test-runs/42",
-      artifacts: 2,
+      artifacts: 3,
     });
     const objectPuts = calls.filter((c) => c.url.startsWith("https://objects.example/"));
-    expect(objectPuts).toHaveLength(2);
+    expect(objectPuts).toHaveLength(3);
     expect(objectPuts.every((c) => !(c.init.headers as Record<string, string>).authorization)).toBe(
       true,
     );
@@ -106,5 +117,51 @@ describe("Playwright playback upload", () => {
         fetch: async () => new Response("nope", { status: 401 }),
       }),
     ).rejects.toThrow("manifest failed (401)");
+  });
+
+  it("surfaces object upload and completion failures", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "covallaby-playwright-"));
+    const results = join(dir, "results.json");
+    await writeFile(results, JSON.stringify({ suites: [] }));
+    const manifest = {
+      run: { id: 9 },
+      artifacts: [{ uploadUrl: "https://objects.example/0" }],
+      url: "/run/9",
+    };
+    await expect(
+      uploadPlaywrightRun({
+        serverUrl: "https://app.example",
+        token: "secret",
+        resultsPath: results,
+        artifactPaths: [],
+        repo: "acme/app",
+        branch: "main",
+        commit: "abc",
+        pr: null,
+        fetch: async (input) =>
+          String(input).endsWith("/api/v1/test-runs")
+            ? Response.json(manifest, { status: 201 })
+            : new Response("storage down", { status: 500 }),
+      }),
+    ).rejects.toThrow("Uploading results.json failed (500)");
+
+    await expect(
+      uploadPlaywrightRun({
+        serverUrl: "https://app.example",
+        token: "secret",
+        resultsPath: results,
+        artifactPaths: [],
+        repo: "acme/app",
+        branch: "main",
+        commit: "abc",
+        pr: null,
+        fetch: async (input) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/test-runs")) return Response.json(manifest, { status: 201 });
+          if (url.includes("/complete")) return new Response("missing", { status: 409 });
+          return new Response(null, { status: 200 });
+        },
+      }),
+    ).rejects.toThrow("Completing Covallaby playback failed (409)");
   });
 });

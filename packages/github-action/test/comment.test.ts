@@ -98,6 +98,23 @@ describe("parseInputs", () => {
     );
     expect(() => parseInputs(raw({ files: " " }), "/w")).toThrowError(/`files` is required/);
   });
+
+  it("parses hosted Playwright inputs without retaining a trailing slash", () => {
+    const inputs = parseInputs(
+      raw({
+        files: "coverage.info",
+        "server-url": "https://app.covallaby.com/",
+        "server-token": " secret ",
+        "playwright-results": " results.json ",
+        "playwright-artifacts": "test-results, playwright-report\ntrace.zip",
+      }),
+      "/w",
+    );
+    expect(inputs.serverUrl).toBe("https://app.covallaby.com");
+    expect(inputs.serverToken).toBe("secret");
+    expect(inputs.playwrightResults).toBe("results.json");
+    expect(inputs.playwrightArtifacts).toEqual(["test-results", "playwright-report", "trace.zip"]);
+  });
 });
 
 describe("renderComment path safety", () => {
