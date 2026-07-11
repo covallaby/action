@@ -98,13 +98,19 @@ export async function uploadStorybookPreview(
       `Covallaby returned ${manifest.artifacts.length} upload URLs for ${files.length} Storybook files.`,
     );
   }
+  const artifactsByPath = new Map(manifest.artifacts.map((artifact) => [artifact.path, artifact]));
+  if (artifactsByPath.size !== manifest.artifacts.length) {
+    throw new Error("Covallaby returned duplicate Storybook upload paths.");
+  }
   const serverOrigin = new URL(options.serverUrl).origin;
   for (let start = 0; start < files.length; start += 8) {
     await Promise.all(
-      files.slice(start, start + 8).map(async (file, offset) => {
-        const target = manifest.artifacts[start + offset]!;
-        if (target.path !== file.relativePath) {
-          throw new Error(`Covallaby returned an upload URL for the wrong file: ${target.path}.`);
+      files.slice(start, start + 8).map(async (file) => {
+        const target = artifactsByPath.get(file.relativePath);
+        if (!target) {
+          throw new Error(
+            `Covallaby did not return an upload URL for Storybook file ${file.relativePath}.`,
+          );
         }
         const targetUrl = new URL(target.uploadUrl, `${options.serverUrl}/`);
         const uploaded = await fetcher(targetUrl.toString(), {
