@@ -27395,14 +27395,7 @@ async function run() {
       core.setOutput("playback-url", playback.url);
       commentInput.playback = { url: playback.url, artifacts: playback.artifacts };
       core.info(`Uploaded ${playback.artifacts} Playwright artifacts: ${playback.url}`);
-      await core.summary.addRaw(
-        `
-
-### Browser playback
-
-[Watch this run in Covallaby](${playback.url}) \xB7 ${playback.artifacts} artifacts
-`
-      ).write();
+      await core.summary.addRaw(renderStepSummary(commentInput)).write({ overwrite: true });
     }
     if (inputs.storybookDir) {
       if (!inputs.serverUrl || !inputs.serverToken)
@@ -27421,14 +27414,7 @@ async function run() {
       core.setOutput("storybook-url", preview.url);
       commentInput.storybook = { url: preview.url, files: preview.files };
       core.info(`Uploaded ${preview.files} Storybook files: ${preview.url}`);
-      await core.summary.addRaw(
-        `
-
-### Storybook preview
-
-[Explore this build in Covallaby](${preview.url}) \xB7 ${preview.files} files
-`
-      ).write();
+      await core.summary.addRaw(renderStepSummary(commentInput)).write({ overwrite: true });
     }
     const headSha = github.context.payload.pull_request?.head?.sha;
     let checkRunCreated = false;

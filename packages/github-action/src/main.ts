@@ -187,11 +187,7 @@ export async function run(): Promise<void> {
       core.setOutput("playback-url", playback.url);
       commentInput.playback = { url: playback.url, artifacts: playback.artifacts };
       core.info(`Uploaded ${playback.artifacts} Playwright artifacts: ${playback.url}`);
-      await core.summary
-        .addRaw(
-          `\n\n### Browser playback\n\n[Watch this run in Covallaby](${playback.url}) · ${playback.artifacts} artifacts\n`,
-        )
-        .write();
+      await core.summary.addRaw(renderStepSummary(commentInput)).write({ overwrite: true });
     }
 
     if (inputs.storybookDir) {
@@ -213,11 +209,7 @@ export async function run(): Promise<void> {
       core.setOutput("storybook-url", preview.url);
       commentInput.storybook = { url: preview.url, files: preview.files };
       core.info(`Uploaded ${preview.files} Storybook files: ${preview.url}`);
-      await core.summary
-        .addRaw(
-          `\n\n### Storybook preview\n\n[Explore this build in Covallaby](${preview.url}) · ${preview.files} files\n`,
-        )
-        .write();
+      await core.summary.addRaw(renderStepSummary(commentInput)).write({ overwrite: true });
     }
 
     // Rich Checks-tab entry: title, full markdown report, and annotations.
