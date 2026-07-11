@@ -118,22 +118,26 @@ export async function run(): Promise<void> {
     );
     if (inputs.serverToken) core.setSecret(inputs.serverToken);
 
-    const report = ignorePaths(
-      loadReport(inputs.files, inputs.format, inputs.stripPrefix),
-      inputs.ignore,
-    );
+    const hasCoverage = inputs.files.length > 0;
+    const report = hasCoverage
+      ? ignorePaths(loadReport(inputs.files, inputs.format, inputs.stripPrefix), inputs.ignore)
+      : { files: [] };
     const summary = summarize(report);
-    const fileWord = inputs.files.length === 1 ? "file" : "files";
-    core.info(
-      `Parsed ${inputs.files.length} coverage ${fileWord}: ${summary.lines.covered}/${summary.lines.total} lines covered (${formatPercent(summary.lines.percent)}).`,
-    );
+    if (hasCoverage) {
+      const fileWord = inputs.files.length === 1 ? "file" : "files";
+      core.info(
+        `Parsed ${inputs.files.length} coverage ${fileWord}: ${summary.lines.covered}/${summary.lines.total} lines covered (${formatPercent(summary.lines.percent)}).`,
+      );
+    } else {
+      core.info("Running in visual-artifact-only mode; no coverage report was supplied.");
+    }
 
     const prNumber = github.context.payload.pull_request?.number;
     // Only touch the API in PR context — `push` runs and local runs stay offline.
     const octokit = prNumber !== undefined ? github.getOctokit(inputs.githubToken) : null;
 
     let patch = null;
-    if (octokit && prNumber !== undefined) {
+    if (hasCoverage && octokit && prNumber !== undefined) {
       try {
         const changed = await fetchChangedFiles(octokit, prNumber);
         patch = computePatchCoverage(report, changed);
@@ -165,7 +169,7 @@ export async function run(): Promise<void> {
     core.setOutput("uncovered-lines", String(summary.lines.total - summary.lines.covered));
     core.setOutput("ok", String(result.ok));
 
-    await core.summary.addRaw(renderStepSummary(commentInput)).write();
+    if (hasCoverage) await core.summary.addRaw(renderStepSummary(commentInput)).write();
 
     if (inputs.playwrightResults) {
       if (!inputs.serverUrl || !inputs.serverToken)
@@ -215,7 +219,7 @@ export async function run(): Promise<void> {
     // Rich Checks-tab entry: title, full markdown report, and annotations.
     const headSha = github.context.payload.pull_request?.head?.sha as string | undefined;
     let checkRunCreated = false;
-    if (inputs.check && octokit && headSha) {
+    if (hasCoverage && inputs.check && octokit && headSha) {
       const checkRun = buildCheckRun(summary, patch, inputs.thresholds, result);
       const checkAnnotations = patch ? buildAnnotations(patch, 50).annotations : [];
       try {
@@ -247,7 +251,7 @@ export async function run(): Promise<void> {
 
     // Diff annotations via log commands — only when the check run (which
     // carries richer annotations) didn't land, to avoid duplicates.
-    if (inputs.annotations && !checkRunCreated && patch) {
+    if (hasCoverage && inputs.annotations && !checkRunCreated && patch) {
       const { annotations, remaining } = buildAnnotations(patch);
       for (const a of annotations) {
         core.warning(a.message, {
@@ -266,7 +270,7 @@ export async function run(): Promise<void> {
     }
 
     // Named entries in the PR checks list, individually requirable.
-    if (inputs.statuses && octokit && headSha) {
+    if (hasCoverage && inputs.statuses && octokit && headSha) {
       for (const status of buildStatuses(summary, patch, inputs.thresholds, result)) {
         try {
           await octokit.rest.repos.createCommitStatus({

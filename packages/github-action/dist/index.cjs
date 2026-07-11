@@ -26777,6 +26777,7 @@ function codePath(path) {
 var COMMENT_ROWS = 20;
 var REPORT_PAGE_ROWS = 200;
 function headline({ result, patch, summary: summary2 }) {
+  if (summary2.totalFiles === 0) return "Your visual test artifacts are ready.";
   if (!result.ok) {
     const n = result.failures.length;
     return `${n === 1 ? "One thing" : `${n} things`} to look at before merging.`;
@@ -26788,23 +26789,25 @@ function headline({ result, patch, summary: summary2 }) {
 function renderComment(input, maxRows = COMMENT_ROWS) {
   const { summary: summary2, patch, thresholds, result } = input;
   const lines = [COMMENT_MARKER, "", "## \u{1F998} Covallaby", "", headline(input), ""];
-  lines.push("| Metric | Result |");
-  lines.push("|---|---|");
-  lines.push(`| Project coverage | ${formatPercent(summary2.lines.percent)} |`);
-  if (patch && patch.lines.percent !== null) {
-    lines.push(`| Patch coverage | ${formatPercent(patch.lines.percent)} |`);
+  if (summary2.totalFiles > 0) {
+    lines.push("| Metric | Result |");
+    lines.push("|---|---|");
+    lines.push(`| Project coverage | ${formatPercent(summary2.lines.percent)} |`);
+    if (patch && patch.lines.percent !== null) {
+      lines.push(`| Patch coverage | ${formatPercent(patch.lines.percent)} |`);
+    }
+    const required = [];
+    if (thresholds.minProject !== void 0) {
+      required.push(`project ${formatPercent(thresholds.minProject)}`);
+    }
+    if (thresholds.minPatch !== void 0)
+      required.push(`patch ${formatPercent(thresholds.minPatch)}`);
+    if (thresholds.minNewFile !== void 0) {
+      required.push(`new files ${formatPercent(thresholds.minNewFile)}`);
+    }
+    if (required.length > 0) lines.push(`| Required | ${required.join(", ")} |`);
+    lines.push("");
   }
-  const required = [];
-  if (thresholds.minProject !== void 0) {
-    required.push(`project ${formatPercent(thresholds.minProject)}`);
-  }
-  if (thresholds.minPatch !== void 0)
-    required.push(`patch ${formatPercent(thresholds.minPatch)}`);
-  if (thresholds.minNewFile !== void 0) {
-    required.push(`new files ${formatPercent(thresholds.minNewFile)}`);
-  }
-  if (required.length > 0) lines.push(`| Required | ${required.join(", ")} |`);
-  lines.push("");
   if (!result.ok) {
     for (const failure of result.failures) {
       lines.push(`> \u26A0\uFE0F ${failure.message}`);
@@ -26848,7 +26851,7 @@ function renderComment(input, maxRows = COMMENT_ROWS) {
     lines.push("");
   }
   lines.push(
-    `<sub>${summary2.lines.covered} of ${summary2.lines.total} lines covered across ${summary2.totalFiles} files \xB7 [Covallaby](https://github.com/covallaby/action)</sub>`
+    summary2.totalFiles > 0 ? `<sub>${summary2.lines.covered} of ${summary2.lines.total} lines covered across ${summary2.totalFiles} files \xB7 [Covallaby](https://github.com/covallaby/action)</sub>` : "<sub>Visual testing powered by [Covallaby](https://github.com/covallaby/action)</sub>"
   );
   return lines.join("\n");
 }
@@ -26930,9 +26933,11 @@ function parsePercent(raw, name) {
 }
 function parseInputs(raw, workspace) {
   const files = raw.getInput("files").split(/[\n,]/).map((f) => f.trim()).filter((f) => f !== "");
-  if (files.length === 0) {
+  const playwrightResults = raw.getInput("playwright-results").trim();
+  const storybookDir = raw.getInput("storybook-dir").trim();
+  if (files.length === 0 && playwrightResults === "" && storybookDir === "") {
     throw new Error(
-      "`files` is required \u2014 point it at your coverage output, e.g. coverage/lcov.info."
+      "Set `files` for coverage, `playwright-results` for browser playback, or `storybook-dir` for a Storybook preview."
     );
   }
   const format = raw.getInput("format").trim();
@@ -26952,6 +26957,9 @@ function parseInputs(raw, workspace) {
   if (minProject !== void 0) thresholds.minProject = minProject;
   if (minPatch !== void 0) thresholds.minPatch = minPatch;
   if (minNewFile !== void 0) thresholds.minNewFile = minNewFile;
+  if (files.length === 0 && Object.keys(thresholds).length > 0) {
+    throw new Error("Coverage thresholds require at least one `files` input.");
+  }
   const ignore = raw.getInput("ignore").split(/[\n,]/).map((p) => p.trim()).filter((p) => p !== "");
   return {
     files,
@@ -26971,13 +26979,9 @@ function parseInputs(raw, workspace) {
     ...raw.getInput("server-token").trim() && {
       serverToken: raw.getInput("server-token").trim()
     },
-    ...raw.getInput("playwright-results").trim() && {
-      playwrightResults: raw.getInput("playwright-results").trim()
-    },
+    ...playwrightResults && { playwrightResults },
     playwrightArtifacts: raw.getInput("playwright-artifacts").split(/[\n,]/).map((p) => p.trim()).filter(Boolean),
-    ...raw.getInput("storybook-dir").trim() && {
-      storybookDir: raw.getInput("storybook-dir").trim()
-    }
+    ...storybookDir && { storybookDir }
   };
 }
 
@@ -27337,19 +27341,21 @@ async function run() {
       process.env.GITHUB_WORKSPACE ?? process.cwd()
     );
     if (inputs.serverToken) core.setSecret(inputs.serverToken);
-    const report = ignorePaths(
-      loadReport(inputs.files, inputs.format, inputs.stripPrefix),
-      inputs.ignore
-    );
+    const hasCoverage = inputs.files.length > 0;
+    const report = hasCoverage ? ignorePaths(loadReport(inputs.files, inputs.format, inputs.stripPrefix), inputs.ignore) : { files: [] };
     const summary2 = summarize(report);
-    const fileWord = inputs.files.length === 1 ? "file" : "files";
-    core.info(
-      `Parsed ${inputs.files.length} coverage ${fileWord}: ${summary2.lines.covered}/${summary2.lines.total} lines covered (${formatPercent(summary2.lines.percent)}).`
-    );
+    if (hasCoverage) {
+      const fileWord = inputs.files.length === 1 ? "file" : "files";
+      core.info(
+        `Parsed ${inputs.files.length} coverage ${fileWord}: ${summary2.lines.covered}/${summary2.lines.total} lines covered (${formatPercent(summary2.lines.percent)}).`
+      );
+    } else {
+      core.info("Running in visual-artifact-only mode; no coverage report was supplied.");
+    }
     const prNumber = github.context.payload.pull_request?.number;
     const octokit = prNumber !== void 0 ? github.getOctokit(inputs.githubToken) : null;
     let patch = null;
-    if (octokit && prNumber !== void 0) {
+    if (hasCoverage && octokit && prNumber !== void 0) {
       try {
         const changed = await fetchChangedFiles(octokit, prNumber);
         patch = computePatchCoverage(report, changed);
@@ -27376,7 +27382,7 @@ async function run() {
     );
     core.setOutput("uncovered-lines", String(summary2.lines.total - summary2.lines.covered));
     core.setOutput("ok", String(result.ok));
-    await core.summary.addRaw(renderStepSummary(commentInput)).write();
+    if (hasCoverage) await core.summary.addRaw(renderStepSummary(commentInput)).write();
     if (inputs.playwrightResults) {
       if (!inputs.serverUrl || !inputs.serverToken)
         throw new Error(
@@ -27418,7 +27424,7 @@ async function run() {
     }
     const headSha = github.context.payload.pull_request?.head?.sha;
     let checkRunCreated = false;
-    if (inputs.check && octokit && headSha) {
+    if (hasCoverage && inputs.check && octokit && headSha) {
       const checkRun = buildCheckRun(summary2, patch, inputs.thresholds, result);
       const checkAnnotations = patch ? buildAnnotations(patch, 50).annotations : [];
       try {
@@ -27447,7 +27453,7 @@ async function run() {
         );
       }
     }
-    if (inputs.annotations && !checkRunCreated && patch) {
+    if (hasCoverage && inputs.annotations && !checkRunCreated && patch) {
       const { annotations, remaining } = buildAnnotations(patch);
       for (const a of annotations) {
         core.warning(a.message, {
@@ -27464,7 +27470,7 @@ async function run() {
         );
       }
     }
-    if (inputs.statuses && octokit && headSha) {
+    if (hasCoverage && inputs.statuses && octokit && headSha) {
       for (const status of buildStatuses(summary2, patch, inputs.thresholds, result)) {
         try {
           await octokit.rest.repos.createCommitStatus({

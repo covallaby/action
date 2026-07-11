@@ -42,6 +42,7 @@ const COMMENT_ROWS = 20;
 const REPORT_PAGE_ROWS = 200;
 
 function headline({ result, patch, summary }: CommentInput): string {
+  if (summary.totalFiles === 0) return "Your visual test artifacts are ready.";
   if (!result.ok) {
     const n = result.failures.length;
     return `${n === 1 ? "One thing" : `${n} things`} to look at before merging.`;
@@ -56,23 +57,25 @@ export function renderComment(input: CommentInput, maxRows: number = COMMENT_ROW
   const { summary, patch, thresholds, result } = input;
   const lines: string[] = [COMMENT_MARKER, "", "## 🦘 Covallaby", "", headline(input), ""];
 
-  lines.push("| Metric | Result |");
-  lines.push("|---|---|");
-  lines.push(`| Project coverage | ${formatPercent(summary.lines.percent)} |`);
-  if (patch && patch.lines.percent !== null) {
-    lines.push(`| Patch coverage | ${formatPercent(patch.lines.percent)} |`);
+  if (summary.totalFiles > 0) {
+    lines.push("| Metric | Result |");
+    lines.push("|---|---|");
+    lines.push(`| Project coverage | ${formatPercent(summary.lines.percent)} |`);
+    if (patch && patch.lines.percent !== null) {
+      lines.push(`| Patch coverage | ${formatPercent(patch.lines.percent)} |`);
+    }
+    const required: string[] = [];
+    if (thresholds.minProject !== undefined) {
+      required.push(`project ${formatPercent(thresholds.minProject)}`);
+    }
+    if (thresholds.minPatch !== undefined)
+      required.push(`patch ${formatPercent(thresholds.minPatch)}`);
+    if (thresholds.minNewFile !== undefined) {
+      required.push(`new files ${formatPercent(thresholds.minNewFile)}`);
+    }
+    if (required.length > 0) lines.push(`| Required | ${required.join(", ")} |`);
+    lines.push("");
   }
-  const required: string[] = [];
-  if (thresholds.minProject !== undefined) {
-    required.push(`project ${formatPercent(thresholds.minProject)}`);
-  }
-  if (thresholds.minPatch !== undefined)
-    required.push(`patch ${formatPercent(thresholds.minPatch)}`);
-  if (thresholds.minNewFile !== undefined) {
-    required.push(`new files ${formatPercent(thresholds.minNewFile)}`);
-  }
-  if (required.length > 0) lines.push(`| Required | ${required.join(", ")} |`);
-  lines.push("");
 
   if (!result.ok) {
     for (const failure of result.failures) {
@@ -122,7 +125,9 @@ export function renderComment(input: CommentInput, maxRows: number = COMMENT_ROW
   }
 
   lines.push(
-    `<sub>${summary.lines.covered} of ${summary.lines.total} lines covered across ${summary.totalFiles} files · [Covallaby](https://github.com/covallaby/action)</sub>`,
+    summary.totalFiles > 0
+      ? `<sub>${summary.lines.covered} of ${summary.lines.total} lines covered across ${summary.totalFiles} files · [Covallaby](https://github.com/covallaby/action)</sub>`
+      : "<sub>Visual testing powered by [Covallaby](https://github.com/covallaby/action)</sub>",
   );
   return lines.join("\n");
 }

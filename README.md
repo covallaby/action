@@ -178,7 +178,7 @@ Multiple files merge automatically (test shards, mixed suites):
 
 | Input | Description | Default |
 |---|---|---|
-| `files` | Coverage files, comma/newline separated. **Required.** | — |
+| `files` | Coverage files, comma/newline separated. Optional for visual-artifact-only uploads. | — |
 | `min-patch` | Min coverage % of the lines changed in the PR. | off |
 | `min-project` | Min project line coverage %. | off |
 | `min-new-file` | Min coverage % for each file added in the PR. | off |
@@ -218,13 +218,14 @@ export default defineConfig({
 });
 ```
 
-Then extend the normal Action step:
+Then extend the normal Action step. If this job does not produce coverage,
+omit `files`; Covallaby will publish a focused visual-testing report without
+creating fake or empty coverage metrics:
 
 ```yaml
 - uses: covallaby/action@main
   if: always() # preserve the recording when Playwright fails
   with:
-    files: coverage/lcov.info
     server-url: https://app.covallaby.com
     server-token: ${{ secrets.COVALLABY_TOKEN }}
     playwright-results: playwright-results.json
@@ -248,7 +249,6 @@ Build Storybook in CI, then point the same Action step at its static output:
 - uses: covallaby/action@main
   if: always()
   with:
-    files: coverage/lcov.info
     server-url: https://app.covallaby.com
     server-token: ${{ secrets.COVALLABY_TOKEN }}
     storybook-dir: storybook-static
