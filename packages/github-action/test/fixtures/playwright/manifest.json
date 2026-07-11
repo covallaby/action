@@ -1,0 +1,10 @@
+{
+  "generatedBy": "@playwright/test@1.61.1",
+  "checksums": {
+    "html-report/index.html": "c19bb2b1ce6060d550e0b01374a80bd2921f8541ac03c022469bd6b84c63c41f",
+    "results.json": "f3b5fc6356518b66a80c0b193abdd35b2ccfe874be5e83dcd4412da7ad71d308",
+    "screenshot.png": "9d05317b4afaacce60679c91b101bacbbeb501099a5980228bd2cc156d13159e",
+    "trace.zip": "d8f75781dc9458e43dc0577b1112fc8883dedb2977e313a1a1e0d5f4bd27c166",
+    "video.webm": "bbb388272c98d4b0e2ca2450ceb299c95a0ba4198f6136682cdf00c49f91f52c"
+  }
+}
