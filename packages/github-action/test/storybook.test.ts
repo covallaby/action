@@ -1,15 +1,13 @@
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { uploadStorybookPreview } from "../src/storybook.js";
 
 describe("Storybook preview upload", () => {
   it("preserves relative paths and protects the server token", async () => {
-    const root = await mkdtemp(join(tmpdir(), "covallaby-storybook-"));
-    await mkdir(join(root, "assets"));
-    await writeFile(join(root, "index.html"), "<h1>Storybook</h1>");
-    await writeFile(join(root, "assets", "app.js"), "console.log('storybook')");
+    const root = fileURLToPath(new URL("./fixtures/storybook", import.meta.url));
     const calls: Array<{ url: string; authorization?: string }> = [];
     const result = await uploadStorybookPreview({
       serverUrl: "https://app.example",
@@ -27,10 +25,9 @@ describe("Storybook preview upload", () => {
         });
         if (url.endsWith("/api/v1/storybook-previews")) {
           const body = JSON.parse(String(init.body)) as { files: Array<{ path: string }> };
-          expect(body.files.map((file) => file.path).sort()).toEqual([
-            "assets/app.js",
-            "index.html",
-          ]);
+          expect(body.files.some((file) => file.path === "index.html")).toBe(true);
+          expect(body.files.some((file) => file.path === "iframe.html")).toBe(true);
+          expect(body.files.some((file) => file.path.startsWith("sb-manager/"))).toBe(true);
           return Response.json(
             {
               run: { id: 8 },
@@ -39,7 +36,7 @@ describe("Storybook preview upload", () => {
                 uploadUrl:
                   file.path === "index.html"
                     ? "/local/index.html"
-                    : "https://objects.example/assets/app.js",
+                    : `https://objects.example/${file.path}`,
               })),
               url: "/r/acme/app/storybook-previews/8",
             },
@@ -52,7 +49,7 @@ describe("Storybook preview upload", () => {
     expect(result).toEqual({
       id: 8,
       url: "https://app.example/r/acme/app/storybook-previews/8",
-      files: 2,
+      files: 30,
     });
     expect(
       calls.find((call) => call.url.includes("objects.example"))?.authorization,
