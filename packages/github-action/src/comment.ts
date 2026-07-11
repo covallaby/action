@@ -29,6 +29,7 @@ export interface CommentInput {
   result: CheckResult;
   /** Directory-rollup depth: "auto" (default), a number, or "off". */
   breakdown?: number | "auto" | "off";
+  playback?: { url: string; artifacts: number };
 }
 
 /**
@@ -100,6 +101,15 @@ export function renderComment(input: CommentInput, maxRows: number = COMMENT_ROW
   }
 
   lines.push(...renderBreakdown(summary, patch, input.breakdown ?? "auto", maxRows));
+
+  if (input.playback) {
+    lines.push("### Browser playback");
+    lines.push("");
+    lines.push(
+      `[Watch this run in Covallaby](${input.playback.url}) · ${input.playback.artifacts} artifacts`,
+    );
+    lines.push("");
+  }
 
   lines.push(
     `<sub>${summary.lines.covered} of ${summary.lines.total} lines covered across ${summary.totalFiles} files · [Covallaby](https://github.com/covallaby/action)</sub>`,

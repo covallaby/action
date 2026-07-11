@@ -70,6 +70,18 @@ describe("renderComment", () => {
   it("omits the marker from the step summary", () => {
     expect(renderStepSummary(build({}))).not.toContain(COMMENT_MARKER);
   });
+
+  it("links the hosted browser playback from the sticky comment", () => {
+    const comment = renderComment({
+      ...build({}),
+      playback: { url: "https://app.covallaby.com/r/acme/app/test-runs/42", artifacts: 7 },
+    });
+    expect(comment).toContain("### Browser playback");
+    expect(comment).toContain(
+      "[Watch this run in Covallaby](https://app.covallaby.com/r/acme/app/test-runs/42)",
+    );
+    expect(comment).toContain("7 artifacts");
+  });
 });
 
 describe("parseInputs", () => {

@@ -26831,6 +26831,14 @@ function renderComment(input, maxRows = COMMENT_ROWS) {
     lines.push("");
   }
   lines.push(...renderBreakdown(summary2, patch, input.breakdown ?? "auto", maxRows));
+  if (input.playback) {
+    lines.push("### Browser playback");
+    lines.push("");
+    lines.push(
+      `[Watch this run in Covallaby](${input.playback.url}) \xB7 ${input.playback.artifacts} artifacts`
+    );
+    lines.push("");
+  }
   lines.push(
     `<sub>${summary2.lines.covered} of ${summary2.lines.total} lines covered across ${summary2.totalFiles} files \xB7 [Covallaby](https://github.com/covallaby/action)</sub>`
   );
@@ -27225,6 +27233,7 @@ async function run() {
         pr: prNumber ?? null
       });
       core.setOutput("playback-url", playback.url);
+      commentInput.playback = { url: playback.url, artifacts: playback.artifacts };
       core.info(`Uploaded ${playback.artifacts} Playwright artifacts: ${playback.url}`);
       await core.summary.addRaw(
         `

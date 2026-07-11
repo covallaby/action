@@ -184,6 +184,7 @@ export async function run(): Promise<void> {
         pr: prNumber ?? null,
       });
       core.setOutput("playback-url", playback.url);
+      commentInput.playback = { url: playback.url, artifacts: playback.artifacts };
       core.info(`Uploaded ${playback.artifacts} Playwright artifacts: ${playback.url}`);
       await core.summary
         .addRaw(
