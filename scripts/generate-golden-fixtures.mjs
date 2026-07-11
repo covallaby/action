@@ -12,8 +12,13 @@ const target = join(root, "packages", "github-action", "test", "fixtures", "play
 await rm(generated, { recursive: true, force: true });
 await rm(target, { recursive: true, force: true });
 const result = spawnSync(
-  join(root, "node_modules", ".bin", "playwright"),
-  ["test", "--config", join(source, "playwright.config.ts")],
+  process.execPath,
+  [
+    fileURLToPath(import.meta.resolve("@playwright/test/cli")),
+    "test",
+    "--config",
+    join(source, "playwright.config.ts"),
+  ],
   { cwd: source, stdio: "inherit" },
 );
 if (result.status !== 0) process.exit(result.status ?? 1);

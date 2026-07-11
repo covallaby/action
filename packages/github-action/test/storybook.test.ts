@@ -31,13 +31,16 @@ describe("Storybook preview upload", () => {
           return Response.json(
             {
               run: { id: 8 },
-              artifacts: body.files.map((file) => ({
-                path: file.path,
-                uploadUrl:
-                  file.path === "index.html"
-                    ? "/local/index.html"
-                    : `https://objects.example/${file.path}`,
-              })),
+              // The API contract identifies artifacts by path, not array position.
+              artifacts: body.files
+                .map((file) => ({
+                  path: file.path,
+                  uploadUrl:
+                    file.path === "index.html"
+                      ? "/local/index.html"
+                      : `https://objects.example/${file.path}`,
+                }))
+                .reverse(),
               url: "/r/acme/app/storybook-previews/8",
             },
             { status: 201 },
@@ -112,7 +115,7 @@ describe("Storybook preview upload", () => {
         ...options,
         fetch: async () => Response.json(manifest("wrong.html")),
       }),
-    ).rejects.toThrow("upload URL for the wrong file");
+    ).rejects.toThrow("did not return an upload URL for Storybook file index.html");
 
     await expect(
       uploadStorybookPreview({
