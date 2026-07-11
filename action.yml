@@ -7,8 +7,8 @@ branding:
 
 inputs:
   files:
-    description: Coverage files, newline- or comma-separated (e.g. coverage/lcov.info). Merged if several.
-    required: true
+    description: Coverage files, newline- or comma-separated (e.g. coverage/lcov.info). Optional for artifact-only Playwright or Storybook uploads.
+    required: false
   format:
     description: "Coverage format (default: auto-detect). Supported: lcov, jacoco, cobertura, xccov."
     required: false

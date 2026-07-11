@@ -118,7 +118,38 @@ describe("parseInputs", () => {
     expect(() => parseInputs(raw({ files: "a", format: "clover" }), "/w")).toThrowError(
       /understands: lcov, jacoco, cobertura, xccov/,
     );
-    expect(() => parseInputs(raw({ files: " " }), "/w")).toThrowError(/`files` is required/);
+    expect(() => parseInputs(raw({ files: " " }), "/w")).toThrowError(/Set `files`/);
+  });
+
+  it("supports visual-artifact-only runs without fake coverage", () => {
+    const inputs = parseInputs(
+      raw({
+        "playwright-results": "playwright-results.json",
+        "server-url": "https://app.covallaby.com",
+        "server-token": "secret",
+      }),
+      "/w",
+    );
+    expect(inputs.files).toEqual([]);
+    expect(inputs.playwrightResults).toBe("playwright-results.json");
+    expect(() =>
+      parseInputs(raw({ "storybook-dir": "storybook-static", "min-project": "80" }), "/w"),
+    ).toThrowError(/thresholds require/);
+  });
+
+  it("renders an artifact-only comment without imaginary coverage", () => {
+    const summary = summarize({ files: [] });
+    const comment = renderComment({
+      summary,
+      patch: null,
+      thresholds: {},
+      result: checkThresholds(summary, {}),
+      playback: { url: "https://app.covallaby.com/r/acme/app/test-runs/42", artifacts: 7 },
+    });
+    expect(comment).toContain("Your visual test artifacts are ready.");
+    expect(comment).toContain("### Browser playback");
+    expect(comment).not.toContain("Project coverage");
+    expect(comment).not.toContain("0 of 0 lines");
   });
 
   it("parses hosted Playwright inputs without retaining a trailing slash", () => {

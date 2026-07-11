@@ -56,9 +56,11 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
     .split(/[\n,]/)
     .map((f) => f.trim())
     .filter((f) => f !== "");
-  if (files.length === 0) {
+  const playwrightResults = raw.getInput("playwright-results").trim();
+  const storybookDir = raw.getInput("storybook-dir").trim();
+  if (files.length === 0 && playwrightResults === "" && storybookDir === "") {
     throw new Error(
-      "`files` is required — point it at your coverage output, e.g. coverage/lcov.info.",
+      "Set `files` for coverage, `playwright-results` for browser playback, or `storybook-dir` for a Storybook preview.",
     );
   }
 
@@ -81,6 +83,9 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
   if (minProject !== undefined) thresholds.minProject = minProject;
   if (minPatch !== undefined) thresholds.minPatch = minPatch;
   if (minNewFile !== undefined) thresholds.minNewFile = minNewFile;
+  if (files.length === 0 && Object.keys(thresholds).length > 0) {
+    throw new Error("Coverage thresholds require at least one `files` input.");
+  }
 
   const ignore = raw
     .getInput("ignore")
@@ -106,16 +111,12 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
     ...(raw.getInput("server-token").trim() && {
       serverToken: raw.getInput("server-token").trim(),
     }),
-    ...(raw.getInput("playwright-results").trim() && {
-      playwrightResults: raw.getInput("playwright-results").trim(),
-    }),
+    ...(playwrightResults && { playwrightResults }),
     playwrightArtifacts: raw
       .getInput("playwright-artifacts")
       .split(/[\n,]/)
       .map((p) => p.trim())
       .filter(Boolean),
-    ...(raw.getInput("storybook-dir").trim() && {
-      storybookDir: raw.getInput("storybook-dir").trim(),
-    }),
+    ...(storybookDir && { storybookDir }),
   };
 }
