@@ -35,6 +35,10 @@ describe("action.yml", () => {
       "annotations",
       "statuses",
       "github-token",
+      "server-url",
+      "server-token",
+      "playwright-results",
+      "playwright-artifacts",
     ];
     expect(Object.keys(manifest.inputs)).toEqual(expected);
     for (const [name, input] of Object.entries<{ description?: unknown }>(manifest.inputs)) {
@@ -48,6 +52,7 @@ describe("action.yml", () => {
       "patch-coverage",
       "uncovered-lines",
       "ok",
+      "playback-url",
     ]);
   });
 });

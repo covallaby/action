@@ -17,6 +17,7 @@ import { type CoverageFormat, parseCoverage } from "@covallaby/parsers";
 import { buildAnnotations, buildCheckRun, buildStatuses } from "./checks.js";
 import { COMMENT_MARKER, type CommentInput, renderComment, renderStepSummary } from "./comment.js";
 import { parseInputs } from "./inputs.js";
+import { uploadPlaywrightRun } from "./playwright.js";
 
 type Octokit = ReturnType<typeof github.getOctokit>;
 
@@ -114,6 +115,7 @@ export async function run(): Promise<void> {
       { getInput: (name) => core.getInput(name) },
       process.env.GITHUB_WORKSPACE ?? process.cwd(),
     );
+    if (inputs.serverToken) core.setSecret(inputs.serverToken);
 
     const report = ignorePaths(
       loadReport(inputs.files, inputs.format, inputs.stripPrefix),
@@ -163,6 +165,32 @@ export async function run(): Promise<void> {
     core.setOutput("ok", String(result.ok));
 
     await core.summary.addRaw(renderStepSummary(commentInput)).write();
+
+    if (inputs.playwrightResults) {
+      if (!inputs.serverUrl || !inputs.serverToken)
+        throw new Error(
+          "`server-url` and `server-token` are required when `playwright-results` is set.",
+        );
+      const playback = await uploadPlaywrightRun({
+        serverUrl: inputs.serverUrl,
+        token: inputs.serverToken,
+        resultsPath: inputs.playwrightResults,
+        artifactPaths: inputs.playwrightArtifacts,
+        repo: `${github.context.repo.owner}/${github.context.repo.repo}`,
+        branch:
+          (github.context.payload.pull_request?.head?.ref as string | undefined) ??
+          github.context.ref.replace(/^refs\/heads\//, ""),
+        commit: github.context.sha,
+        pr: prNumber ?? null,
+      });
+      core.setOutput("playback-url", playback.url);
+      core.info(`Uploaded ${playback.artifacts} Playwright artifacts: ${playback.url}`);
+      await core.summary
+        .addRaw(
+          `\n\n### Browser playback\n\n[Watch this run in Covallaby](${playback.url}) · ${playback.artifacts} artifacts\n`,
+        )
+        .write();
+    }
 
     // Rich Checks-tab entry: title, full markdown report, and annotations.
     const headSha = github.context.payload.pull_request?.head?.sha as string | undefined;
