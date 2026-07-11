@@ -30,6 +30,7 @@ export interface CommentInput {
   /** Directory-rollup depth: "auto" (default), a number, or "off". */
   breakdown?: number | "auto" | "off";
   playback?: { url: string; artifacts: number };
+  storybook?: { url: string; files: number };
 }
 
 /**
@@ -107,6 +108,15 @@ export function renderComment(input: CommentInput, maxRows: number = COMMENT_ROW
     lines.push("");
     lines.push(
       `[Watch this run in Covallaby](${input.playback.url}) · ${input.playback.artifacts} artifacts`,
+    );
+    lines.push("");
+  }
+
+  if (input.storybook) {
+    lines.push("### Storybook preview");
+    lines.push("");
+    lines.push(
+      `[Explore this build in Covallaby](${input.storybook.url}) · ${input.storybook.files} files`,
     );
     lines.push("");
   }

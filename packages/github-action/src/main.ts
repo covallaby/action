@@ -18,6 +18,7 @@ import { buildAnnotations, buildCheckRun, buildStatuses } from "./checks.js";
 import { COMMENT_MARKER, type CommentInput, renderComment, renderStepSummary } from "./comment.js";
 import { parseInputs } from "./inputs.js";
 import { uploadPlaywrightRun } from "./playwright.js";
+import { uploadStorybookPreview } from "./storybook.js";
 
 type Octokit = ReturnType<typeof github.getOctokit>;
 
@@ -189,6 +190,32 @@ export async function run(): Promise<void> {
       await core.summary
         .addRaw(
           `\n\n### Browser playback\n\n[Watch this run in Covallaby](${playback.url}) · ${playback.artifacts} artifacts\n`,
+        )
+        .write();
+    }
+
+    if (inputs.storybookDir) {
+      if (!inputs.serverUrl || !inputs.serverToken)
+        throw new Error(
+          "`server-url` and `server-token` are required when `storybook-dir` is set.",
+        );
+      const preview = await uploadStorybookPreview({
+        serverUrl: inputs.serverUrl,
+        token: inputs.serverToken,
+        directory: inputs.storybookDir,
+        repo: `${github.context.repo.owner}/${github.context.repo.repo}`,
+        branch:
+          (github.context.payload.pull_request?.head?.ref as string | undefined) ??
+          github.context.ref.replace(/^refs\/heads\//, ""),
+        commit: github.context.sha,
+        pr: prNumber ?? null,
+      });
+      core.setOutput("storybook-url", preview.url);
+      commentInput.storybook = { url: preview.url, files: preview.files };
+      core.info(`Uploaded ${preview.files} Storybook files: ${preview.url}`);
+      await core.summary
+        .addRaw(
+          `\n\n### Storybook preview\n\n[Explore this build in Covallaby](${preview.url}) · ${preview.files} files\n`,
         )
         .write();
     }

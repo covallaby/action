@@ -234,6 +234,25 @@ The Action posts a playback link in the Step Summary and exposes it as
 `playback-url`. Videos and traces upload directly to private object storage via
 short-lived signed URLs; the Action does not send them through the app server.
 
+## Storybook previews
+
+Build Storybook in CI, then point the same Action step at its static output:
+
+```yaml
+- run: npm run build-storybook
+- uses: covallaby/action@main
+  with:
+    files: coverage/lcov.info
+    server-url: https://app.covallaby.com
+    server-token: ${{ secrets.COVALLABY_TOKEN }}
+    storybook-dir: storybook-static
+```
+
+Covallaby uploads the files directly to private object storage and adds an
+isolated, interactive Storybook preview to its sticky PR comment, Step Summary,
+and dashboard. The server must configure a separate `COVALLABY_PREVIEW_BASE_URL`
+origin so repository-controlled preview code never runs with dashboard access.
+
 ## CLI
 
 Everything works locally too:

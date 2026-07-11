@@ -39,6 +39,7 @@ describe("action.yml", () => {
       "server-token",
       "playwright-results",
       "playwright-artifacts",
+      "storybook-dir",
     ];
     expect(Object.keys(manifest.inputs)).toEqual(expected);
     for (const [name, input] of Object.entries<{ description?: unknown }>(manifest.inputs)) {
@@ -53,6 +54,7 @@ describe("action.yml", () => {
       "uncovered-lines",
       "ok",
       "playback-url",
+      "storybook-url",
     ]);
   });
 });
