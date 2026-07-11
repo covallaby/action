@@ -17,6 +17,7 @@ export interface ActionInputs {
   serverToken?: string;
   playwrightResults?: string;
   playwrightArtifacts: string[];
+  storybookDir?: string;
 }
 
 export interface RawInputs {
@@ -113,5 +114,8 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
       .split(/[\n,]/)
       .map((p) => p.trim())
       .filter(Boolean),
+    ...(raw.getInput("storybook-dir").trim() && {
+      storybookDir: raw.getInput("storybook-dir").trim(),
+    }),
   };
 }

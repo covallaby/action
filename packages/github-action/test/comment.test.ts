@@ -71,6 +71,16 @@ describe("renderComment", () => {
     expect(renderStepSummary(build({}))).not.toContain(COMMENT_MARKER);
   });
 
+  it("keeps visual testing links before the report footer", () => {
+    const summary = renderStepSummary({
+      ...build({}),
+      playback: { url: "https://app.example/playback/42", artifacts: 7 },
+      storybook: { url: "https://app.example/storybook/8", files: 30 },
+    });
+    expect(summary.indexOf("### Browser playback")).toBeLessThan(summary.indexOf("### Storybook"));
+    expect(summary.indexOf("### Storybook")).toBeLessThan(summary.indexOf("<sub>"));
+  });
+
   it("links the hosted browser playback from the sticky comment", () => {
     const comment = renderComment({
       ...build({}),
@@ -119,6 +129,7 @@ describe("parseInputs", () => {
         "server-token": " secret ",
         "playwright-results": " results.json ",
         "playwright-artifacts": "test-results, playwright-report\ntrace.zip",
+        "storybook-dir": " storybook-static ",
       }),
       "/w",
     );
@@ -126,6 +137,17 @@ describe("parseInputs", () => {
     expect(inputs.serverToken).toBe("secret");
     expect(inputs.playwrightResults).toBe("results.json");
     expect(inputs.playwrightArtifacts).toEqual(["test-results", "playwright-report", "trace.zip"]);
+    expect(inputs.storybookDir).toBe("storybook-static");
+  });
+
+  it("links a hosted Storybook preview from the sticky comment", () => {
+    const comment = renderComment({
+      ...build({}),
+      storybook: { url: "https://app.covallaby.com/r/acme/app/storybook-previews/8", files: 42 },
+    });
+    expect(comment).toContain("### Storybook preview");
+    expect(comment).toContain("[Explore this build in Covallaby]");
+    expect(comment).toContain("42 files");
   });
 });
 
