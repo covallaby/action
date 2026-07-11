@@ -63,6 +63,9 @@ inputs:
   playwright-artifacts:
     description: Additional Playwright files or directories to upload, comma- or newline-separated.
     required: false
+  storybook-dir:
+    description: Built Storybook directory (usually storybook-static). Publishes an isolated preview.
+    required: false
 
 outputs:
   project-coverage:
@@ -75,6 +78,8 @@ outputs:
     description: "'true' when every configured threshold passed."
   playback-url:
     description: Hosted URL for the uploaded Playwright browser run, or empty when disabled.
+  storybook-url:
+    description: Hosted URL for the uploaded Storybook preview, or empty when disabled.
 
 runs:
   using: node24
