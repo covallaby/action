@@ -15,7 +15,8 @@ export interface PlaybackOptions {
 }
 
 interface ArtifactFile {
-  path: string;
+  path?: string;
+  body?: Buffer;
   name: string;
   kind: string;
   contentType: string;
@@ -24,7 +25,10 @@ interface ArtifactFile {
 }
 
 interface PlaywrightAttachment {
+  name?: string;
+  contentType?: string;
   path?: string;
+  body?: string;
 }
 interface PlaywrightResult {
   status?: string;
@@ -57,7 +61,11 @@ const MIME: Record<string, string> = {
   ".json": "application/json",
   ".html": "text/html",
 };
-const kindOf = (path: string): string => {
+const kindOf = (path: string, contentType?: string): string => {
+  if (contentType?.startsWith("image/")) return "screenshot";
+  if (contentType?.startsWith("video/")) return "video";
+  if (contentType === "application/zip" && basename(path).includes("trace")) return "trace";
+  if (contentType === "application/json") return "results";
   const ext = extname(path).toLowerCase();
   if (ext === ".webm" || ext === ".mp4") return "video";
   if ([".png", ".jpg", ".jpeg"].includes(ext)) return "screenshot";
@@ -93,8 +101,10 @@ function testMetadata(json: PlaywrightJson): {
   skipped: number;
   durationMs: number;
   names: Map<string, string>;
+  inline: Array<{ name: string; contentType: string; body: Buffer; testName: string }>;
 } {
   const names = new Map<string, string>();
+  const inline: Array<{ name: string; contentType: string; body: Buffer; testName: string }> = [];
   let passed = 0;
   let failed = 0;
   let skipped = 0;
@@ -111,14 +121,31 @@ function testMetadata(json: PlaywrightJson): {
         else failed++;
         for (const result of results) {
           durationMs += Number(result.duration) || 0;
-          for (const attachment of result.attachments ?? [])
+          for (const attachment of result.attachments ?? []) {
             if (attachment.path) names.set(resolve(attachment.path), title);
+            else if (attachment.body && attachment.name && attachment.contentType) {
+              const extension =
+                attachment.contentType === "image/png"
+                  ? ".png"
+                  : attachment.contentType === "image/jpeg"
+                    ? ".jpg"
+                    : attachment.contentType === "application/json"
+                      ? ".json"
+                      : "";
+              inline.push({
+                name: extname(attachment.name) ? attachment.name : `${attachment.name}${extension}`,
+                contentType: attachment.contentType,
+                body: Buffer.from(attachment.body, "base64"),
+                testName: title,
+              });
+            }
+          }
         }
       }
     for (const child of suite.suites ?? []) visitSuite(child, next);
   };
   for (const suite of json.suites ?? []) visitSuite(suite);
-  return { passed, failed, skipped, durationMs, names };
+  return { passed, failed, skipped, durationMs, names, inline };
 }
 
 export async function uploadPlaywrightRun(
@@ -155,6 +182,16 @@ export async function uploadPlaywrightRun(
       testName: attachmentNames.get(path) ?? meta.names.get(path) ?? null,
     });
   }
+  for (const attachment of meta.inline) {
+    files.push({
+      body: attachment.body,
+      name: attachment.name,
+      kind: kindOf(attachment.name, attachment.contentType),
+      contentType: attachment.contentType,
+      sizeBytes: attachment.body.byteLength,
+      testName: attachment.testName,
+    });
+  }
   const auth = { authorization: `Bearer ${options.token}` };
   const created = await fetcher(`${options.serverUrl}/api/v1/test-runs`, {
     method: "POST",
@@ -169,7 +206,7 @@ export async function uploadPlaywrightRun(
       testsFailed: meta.failed,
       testsSkipped: meta.skipped,
       durationMs: meta.durationMs,
-      artifacts: files.map(({ path: _, ...file }) => file),
+      artifacts: files.map(({ path: _, body: __, ...file }) => file),
     }),
   });
   if (!created.ok)
@@ -200,7 +237,7 @@ export async function uploadPlaywrightRun(
             "content-length": String(file.sizeBytes),
             ...(localUpload ? auth : {}),
           },
-          body: createReadStream(file.path) as never,
+          body: (file.body ?? createReadStream(file.path!)) as never,
           duplex: "half",
         } as RequestInit);
         if (!uploaded.ok)

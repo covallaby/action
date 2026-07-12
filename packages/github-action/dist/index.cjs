@@ -26999,7 +26999,11 @@ var MIME = {
   ".json": "application/json",
   ".html": "text/html"
 };
-var kindOf = (path) => {
+var kindOf = (path, contentType) => {
+  if (contentType?.startsWith("image/")) return "screenshot";
+  if (contentType?.startsWith("video/")) return "video";
+  if (contentType === "application/zip" && (0, import_node_path.basename)(path).includes("trace")) return "trace";
+  if (contentType === "application/json") return "results";
   const ext = (0, import_node_path.extname)(path).toLowerCase();
   if (ext === ".webm" || ext === ".mp4") return "video";
   if ([".png", ".jpg", ".jpeg"].includes(ext)) return "screenshot";
@@ -27025,6 +27029,7 @@ async function filesUnder(path, root = path) {
 }
 function testMetadata(json) {
   const names = /* @__PURE__ */ new Map();
+  const inline = [];
   let passed = 0;
   let failed = 0;
   let skipped = 0;
@@ -27041,14 +27046,24 @@ function testMetadata(json) {
         else failed++;
         for (const result of results) {
           durationMs += Number(result.duration) || 0;
-          for (const attachment of result.attachments ?? [])
+          for (const attachment of result.attachments ?? []) {
             if (attachment.path) names.set((0, import_node_path.resolve)(attachment.path), title);
+            else if (attachment.body && attachment.name && attachment.contentType) {
+              const extension = attachment.contentType === "image/png" ? ".png" : attachment.contentType === "image/jpeg" ? ".jpg" : attachment.contentType === "application/json" ? ".json" : "";
+              inline.push({
+                name: (0, import_node_path.extname)(attachment.name) ? attachment.name : `${attachment.name}${extension}`,
+                contentType: attachment.contentType,
+                body: Buffer.from(attachment.body, "base64"),
+                testName: title
+              });
+            }
+          }
         }
       }
     for (const child of suite.suites ?? []) visitSuite(child, next);
   };
   for (const suite of json.suites ?? []) visitSuite(suite);
-  return { passed, failed, skipped, durationMs, names };
+  return { passed, failed, skipped, durationMs, names, inline };
 }
 async function uploadPlaywrightRun(options) {
   const fetcher = options.fetch ?? globalThis.fetch;
@@ -27081,6 +27096,16 @@ async function uploadPlaywrightRun(options) {
       testName: attachmentNames.get(path) ?? meta.names.get(path) ?? null
     });
   }
+  for (const attachment of meta.inline) {
+    files.push({
+      body: attachment.body,
+      name: attachment.name,
+      kind: kindOf(attachment.name, attachment.contentType),
+      contentType: attachment.contentType,
+      sizeBytes: attachment.body.byteLength,
+      testName: attachment.testName
+    });
+  }
   const auth = { authorization: `Bearer ${options.token}` };
   const created = await fetcher(`${options.serverUrl}/api/v1/test-runs`, {
     method: "POST",
@@ -27095,7 +27120,7 @@ async function uploadPlaywrightRun(options) {
       testsFailed: meta.failed,
       testsSkipped: meta.skipped,
       durationMs: meta.durationMs,
-      artifacts: files.map(({ path: _, ...file }) => file)
+      artifacts: files.map(({ path: _, body: __, ...file }) => file)
     })
   });
   if (!created.ok)
@@ -27122,7 +27147,7 @@ async function uploadPlaywrightRun(options) {
             "content-length": String(file.sizeBytes),
             ...localUpload ? auth : {}
           },
-          body: (0, import_node_fs.createReadStream)(file.path),
+          body: file.body ?? (0, import_node_fs.createReadStream)(file.path),
           duplex: "half"
         });
         if (!uploaded.ok)
