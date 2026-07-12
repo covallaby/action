@@ -64,8 +64,15 @@ inputs:
     description: Additional Playwright files or directories to upload, comma- or newline-separated.
     required: false
   storybook-dir:
-    description: Built Storybook directory (usually storybook-static). Publishes an isolated preview.
+    description: Built Storybook directory (usually storybook-static). Captures every indexed story and publishes the interactive build.
     required: false
+  component-captures:
+    description: Directory of pre-rendered component PNGs from Phoenix Storybook, Lost Pixel, or another visual test runner.
+    required: false
+  storybook-capture:
+    description: "Per-story image capture: 'auto' (default, capture when Chrome is available), 'required', or 'off'."
+    required: false
+    default: auto
 
 outputs:
   project-coverage:

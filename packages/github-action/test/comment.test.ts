@@ -171,6 +171,17 @@ describe("parseInputs", () => {
     expect(inputs.storybookDir).toBe("storybook-static");
   });
 
+  it("accepts pre-rendered component captures without coverage or Storybook", () => {
+    const inputs = parseInputs(raw({ "component-captures": " .lostpixel/current " }), "/w");
+    expect(inputs.componentCaptures).toBe(".lostpixel/current");
+    expect(() =>
+      parseInputs(
+        raw({ "storybook-dir": "storybook-static", "component-captures": ".lostpixel/current" }),
+        "/w",
+      ),
+    ).toThrowError(/either/);
+  });
+
   it("links a hosted Storybook preview from the sticky comment", () => {
     const comment = renderComment({
       ...build({}),
@@ -179,6 +190,18 @@ describe("parseInputs", () => {
     expect(comment).toContain("### Storybook preview");
     expect(comment).toContain("[Explore this build in Covallaby]");
     expect(comment).toContain("42 files");
+  });
+
+  it("links captured stories to visual review", () => {
+    const comment = renderComment({
+      ...build({}),
+      storybook: {
+        url: "https://app.covallaby.com/r/acme/app/storybook-previews/9",
+        files: 45,
+        captures: 12,
+      },
+    });
+    expect(comment).toContain("Review 12 component captures and visual diffs");
   });
 });
 

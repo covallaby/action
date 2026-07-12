@@ -1,6 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const uploadCoverageFiles = vi.hoisted(() => vi.fn().mockResolvedValue(2));
+const uploadStorybookPreview = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({
+    id: 9,
+    url: "https://app.covallaby.com/r/acme/web/storybook-previews/9",
+    files: 3,
+    captures: 1,
+  }),
+);
+const cleanup = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const prepareComponentCaptures = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({
+    directory: "/tmp/covallaby-captures",
+    captures: [
+      {
+        id: "button",
+        title: "Components",
+        name: "button",
+        path: "_covallaby/captures/001-button.png",
+        sha256: "a".repeat(64),
+      },
+    ],
+    cleanup,
+  }),
+);
 
 const inputs: Record<string, string> = {};
 const addRaw = vi.fn();
@@ -44,8 +68,9 @@ vi.mock("../src/playwright.js", () => ({
   }),
 }));
 
-vi.mock("../src/storybook.js", () => ({ uploadStorybookPreview: vi.fn() }));
 vi.mock("../src/server-comment.js", () => ({ publishServerComment }));
+vi.mock("../src/storybook.js", () => ({ uploadStorybookPreview }));
+vi.mock("../src/storybook-capture.js", () => ({ prepareComponentCaptures }));
 vi.mock("../src/coverage-upload.js", () => ({ uploadCoverageFiles }));
 
 describe("run", () => {
@@ -122,6 +147,7 @@ describe("run", () => {
 
   it("does not post with GITHUB_TOKEN when the server owns the comment", async () => {
     publishServerComment.mockResolvedValueOnce(true);
+
     const { run } = await import("../src/main.js");
 
     await run();
@@ -130,5 +156,36 @@ describe("run", () => {
       expect.objectContaining({ repo: "acme/web", pr: 42 }),
     );
     expect(createComment).not.toHaveBeenCalled();
+  });
+
+  it("packages and publishes pre-rendered component captures", async () => {
+    inputs["playwright-results"] = "";
+    inputs["playwright-artifacts"] = "";
+    inputs["component-captures"] = ".lostpixel/current";
+    const core = await import("@actions/core");
+    const { run } = await import("../src/main.js");
+
+    await run();
+
+    expect(prepareComponentCaptures).toHaveBeenCalledWith(".lostpixel/current");
+    expect(uploadStorybookPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        directory: "/tmp/covallaby-captures",
+        repo: "acme/web",
+        branch: "visuals",
+        commit: "abc123",
+        pr: 42,
+        captureMode: "off",
+        captures: expect.arrayContaining([expect.objectContaining({ id: "button" })]),
+      }),
+    );
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(core.setOutput).toHaveBeenCalledWith(
+      "storybook-url",
+      "https://app.covallaby.com/r/acme/web/storybook-previews/9",
+    );
+    expect(createComment).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.stringContaining("visual diffs") }),
+    );
   });
 });
