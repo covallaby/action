@@ -120,7 +120,7 @@ export function renderComment(input: CommentInput, maxRows: number = COMMENT_ROW
     lines.push("");
     lines.push(
       input.storybook.captures
-        ? `[Review ${input.storybook.captures} component captures in Covallaby](${input.storybook.url})`
+        ? `[Review ${input.storybook.captures} component captures and visual diffs in Covallaby](${input.storybook.url})`
         : `[Explore this build in Covallaby](${input.storybook.url}) · ${input.storybook.files} files`,
     );
     lines.push("");
