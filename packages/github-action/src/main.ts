@@ -19,6 +19,7 @@ import { COMMENT_MARKER, type CommentInput, renderComment, renderStepSummary } f
 import { uploadCoverageFiles } from "./coverage-upload.js";
 import { parseInputs } from "./inputs.js";
 import { uploadPlaywrightRun } from "./playwright.js";
+import { prepareComponentCaptures } from "./storybook-capture.js";
 import { uploadStorybookPreview } from "./storybook.js";
 
 type Octokit = ReturnType<typeof github.getOctokit>;
@@ -212,34 +213,42 @@ export async function run(): Promise<void> {
       await core.summary.addRaw(renderStepSummary(commentInput)).write({ overwrite: true });
     }
 
-    if (inputs.storybookDir) {
+    if (inputs.storybookDir || inputs.componentCaptures) {
       if (!inputs.serverUrl || !inputs.serverToken)
         throw new Error(
-          "`server-url` and `server-token` are required when `storybook-dir` is set.",
+          "`server-url` and `server-token` are required for component capture uploads.",
         );
-      const preview = await uploadStorybookPreview({
-        serverUrl: inputs.serverUrl,
-        token: inputs.serverToken,
-        directory: inputs.storybookDir,
-        repo: `${github.context.repo.owner}/${github.context.repo.repo}`,
-        branch:
-          (github.context.payload.pull_request?.head?.ref as string | undefined) ??
-          github.context.ref.replace(/^refs\/heads\//, ""),
-        commit: github.context.sha,
-        pr: prNumber ?? null,
-        captureMode: inputs.storybookCapture,
-      });
-      core.setOutput("storybook-url", preview.url);
-      commentInput.storybook = {
-        url: preview.url,
-        files: preview.files,
-        captures: preview.captures,
-      };
-      core.info(`Uploaded ${preview.files} Storybook files: ${preview.url}`);
-      if (preview.captureSkipped)
-        core.warning(`Storybook image capture skipped: ${preview.captureSkipped}`);
-      else core.info(`Captured ${preview.captures} individual Storybook stories.`);
-      await core.summary.addRaw(renderStepSummary(commentInput)).write({ overwrite: true });
+      const prepared = inputs.componentCaptures
+        ? await prepareComponentCaptures(inputs.componentCaptures)
+        : null;
+      try {
+        const preview = await uploadStorybookPreview({
+          serverUrl: inputs.serverUrl,
+          token: inputs.serverToken,
+          directory: prepared?.directory ?? inputs.storybookDir!,
+          repo: `${github.context.repo.owner}/${github.context.repo.repo}`,
+          branch:
+            (github.context.payload.pull_request?.head?.ref as string | undefined) ??
+            github.context.ref.replace(/^refs\/heads\//, ""),
+          commit: github.context.sha,
+          pr: prNumber ?? null,
+          captureMode: prepared ? "off" : inputs.storybookCapture,
+          ...(prepared && { captures: prepared.captures }),
+        });
+        core.setOutput("storybook-url", preview.url);
+        commentInput.storybook = {
+          url: preview.url,
+          files: preview.files,
+          captures: preview.captures,
+        };
+        core.info(`Uploaded ${preview.files} component preview files: ${preview.url}`);
+        if (preview.captureSkipped)
+          core.warning(`Storybook image capture skipped: ${preview.captureSkipped}`);
+        else core.info(`Published ${preview.captures} individual component captures.`);
+        await core.summary.addRaw(renderStepSummary(commentInput)).write({ overwrite: true });
+      } finally {
+        await prepared?.cleanup();
+      }
     }
 
     // Rich Checks-tab entry: title, full markdown report, and annotations.

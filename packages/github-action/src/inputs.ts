@@ -18,6 +18,7 @@ export interface ActionInputs {
   playwrightResults?: string;
   playwrightArtifacts: string[];
   storybookDir?: string;
+  componentCaptures?: string;
   storybookCapture: "auto" | "required" | "off";
 }
 
@@ -65,9 +66,18 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
     .filter((f) => f !== "");
   const playwrightResults = raw.getInput("playwright-results").trim();
   const storybookDir = raw.getInput("storybook-dir").trim();
-  if (files.length === 0 && playwrightResults === "" && storybookDir === "") {
+  const componentCaptures = raw.getInput("component-captures").trim();
+  if (storybookDir && componentCaptures) {
+    throw new Error("Set either `storybook-dir` or `component-captures`, not both.");
+  }
+  if (
+    files.length === 0 &&
+    playwrightResults === "" &&
+    storybookDir === "" &&
+    componentCaptures === ""
+  ) {
     throw new Error(
-      "Set `files` for coverage, `playwright-results` for browser playback, or `storybook-dir` for a Storybook preview.",
+      "Set `files` for coverage, `playwright-results` for browser playback, `storybook-dir` for Storybook, or `component-captures` for pre-rendered PNGs.",
     );
   }
 
@@ -125,6 +135,7 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
       .map((p) => p.trim())
       .filter(Boolean),
     ...(storybookDir && { storybookDir }),
+    ...(componentCaptures && { componentCaptures }),
     storybookCapture: parseStorybookCapture(raw.getInput("storybook-capture")),
   };
 }
