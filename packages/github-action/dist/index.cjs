@@ -27199,6 +27199,27 @@ async function uploadPlaywrightRun(options) {
   };
 }
 
+// src/server-comment.ts
+async function publishServerComment(input) {
+  const response = await fetch(`${input.serverUrl}/api/v1/github/pr-comment`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${input.token}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      repo: input.repo,
+      pr: input.pr,
+      marker: input.marker,
+      body: input.body
+    })
+  });
+  if (response.status === 404) return false;
+  if (!response.ok) throw new Error(`Covallaby server PR comment \u2192 ${response.status}`);
+  const result = await response.json();
+  return result.handled === true;
+}
+
 // src/storybook.ts
 var import_node_fs2 = require("node:fs");
 var import_promises3 = require("node:fs/promises");
@@ -27552,7 +27573,25 @@ async function run() {
         }
       }
     }
-    if (octokit && prNumber !== void 0 && inputs.comment === "update") {
+    let serverHandledComment = false;
+    if (prNumber !== void 0 && inputs.comment === "update" && inputs.serverUrl && inputs.serverToken) {
+      try {
+        serverHandledComment = await publishServerComment({
+          serverUrl: inputs.serverUrl,
+          token: inputs.serverToken,
+          repo: `${github.context.repo.owner}/${github.context.repo.repo}`,
+          pr: prNumber,
+          marker: COMMENT_MARKER,
+          body: renderComment(commentInput)
+        });
+        if (serverHandledComment) core.info("Covallaby server updated the sticky PR comment.");
+      } catch (error) {
+        core.warning(
+          `Covallaby server couldn't own the PR comment (${error.message}); falling back to GITHUB_TOKEN.`
+        );
+      }
+    }
+    if (octokit && prNumber !== void 0 && inputs.comment === "update" && !serverHandledComment) {
       try {
         await upsertComment(octokit, prNumber, renderComment(commentInput));
       } catch (error) {

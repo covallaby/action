@@ -19,6 +19,7 @@ import { COMMENT_MARKER, type CommentInput, renderComment, renderStepSummary } f
 import { uploadCoverageFiles } from "./coverage-upload.js";
 import { parseInputs } from "./inputs.js";
 import { uploadPlaywrightRun } from "./playwright.js";
+import { publishServerComment } from "./server-comment.js";
 import { uploadStorybookPreview } from "./storybook.js";
 
 type Octokit = ReturnType<typeof github.getOctokit>;
@@ -307,7 +308,31 @@ export async function run(): Promise<void> {
       }
     }
 
-    if (octokit && prNumber !== undefined && inputs.comment === "update") {
+    let serverHandledComment = false;
+    if (
+      prNumber !== undefined &&
+      inputs.comment === "update" &&
+      inputs.serverUrl &&
+      inputs.serverToken
+    ) {
+      try {
+        serverHandledComment = await publishServerComment({
+          serverUrl: inputs.serverUrl,
+          token: inputs.serverToken,
+          repo: `${github.context.repo.owner}/${github.context.repo.repo}`,
+          pr: prNumber,
+          marker: COMMENT_MARKER,
+          body: renderComment(commentInput),
+        });
+        if (serverHandledComment) core.info("Covallaby server updated the sticky PR comment.");
+      } catch (error) {
+        core.warning(
+          `Covallaby server couldn't own the PR comment (${(error as Error).message}); falling back to GITHUB_TOKEN.`,
+        );
+      }
+    }
+
+    if (octokit && prNumber !== undefined && inputs.comment === "update" && !serverHandledComment) {
       try {
         await upsertComment(octokit, prNumber, renderComment(commentInput));
       } catch (error) {
