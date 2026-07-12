@@ -30,6 +30,7 @@ const inputs: Record<string, string> = {};
 const addRaw = vi.fn();
 const write = vi.fn();
 const createComment = vi.fn();
+const publishServerComment = vi.hoisted(() => vi.fn().mockResolvedValue(false));
 
 vi.mock("@actions/core", () => ({
   getInput: vi.fn((name: string) => inputs[name] ?? ""),
@@ -67,6 +68,7 @@ vi.mock("../src/playwright.js", () => ({
   }),
 }));
 
+vi.mock("../src/server-comment.js", () => ({ publishServerComment }));
 vi.mock("../src/storybook.js", () => ({ uploadStorybookPreview }));
 vi.mock("../src/storybook-capture.js", () => ({ prepareComponentCaptures }));
 vi.mock("../src/coverage-upload.js", () => ({ uploadCoverageFiles }));
@@ -141,6 +143,19 @@ describe("run", () => {
       pr: 42,
     });
     expect(core.info).toHaveBeenCalledWith("Uploaded 2 coverage files to Covallaby.");
+  });
+
+  it("does not post with GITHUB_TOKEN when the server owns the comment", async () => {
+    publishServerComment.mockResolvedValueOnce(true);
+
+    const { run } = await import("../src/main.js");
+
+    await run();
+
+    expect(publishServerComment).toHaveBeenCalledWith(
+      expect.objectContaining({ repo: "acme/web", pr: 42 }),
+    );
+    expect(createComment).not.toHaveBeenCalled();
   });
 
   it("packages and publishes pre-rendered component captures", async () => {
