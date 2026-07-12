@@ -13,7 +13,8 @@
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
     "@covallaby/core": "workspace:*",
-    "@covallaby/parsers": "workspace:*"
+    "@covallaby/parsers": "workspace:*",
+    "puppeteer-core": "^24.16.0"
   },
   "devDependencies": {
     "esbuild": "^0.24.2",

@@ -17,6 +17,7 @@ describe("Storybook preview upload", () => {
       branch: "feature/button",
       commit: "abc",
       pr: 9,
+      captureMode: "off",
       fetch: (async (input, init = {}) => {
         const url = String(input);
         calls.push({
@@ -53,6 +54,8 @@ describe("Storybook preview upload", () => {
       id: 8,
       url: "https://app.example/r/acme/app/storybook-previews/8",
       files: 30,
+      captures: 0,
+      captureSkipped: "disabled",
     });
     expect(
       calls.find((call) => call.url.includes("objects.example"))?.authorization,
@@ -74,6 +77,7 @@ describe("Storybook preview upload", () => {
         branch: "main",
         commit: "abc",
         pr: null,
+        captureMode: "off",
         fetch: async () => new Response(null),
       }),
     ).rejects.toThrow("does not contain index.html");
@@ -90,6 +94,7 @@ describe("Storybook preview upload", () => {
       branch: "main",
       commit: "abc",
       pr: null,
+      captureMode: "off" as const,
     };
     await expect(
       uploadStorybookPreview({
