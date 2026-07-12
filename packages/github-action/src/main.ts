@@ -16,6 +16,7 @@ import {
 import { type CoverageFormat, parseCoverage } from "@covallaby/parsers";
 import { buildAnnotations, buildCheckRun, buildStatuses } from "./checks.js";
 import { COMMENT_MARKER, type CommentInput, renderComment, renderStepSummary } from "./comment.js";
+import { uploadCoverageFiles } from "./coverage-upload.js";
 import { parseInputs } from "./inputs.js";
 import { uploadPlaywrightRun } from "./playwright.js";
 import { uploadStorybookPreview } from "./storybook.js";
@@ -170,6 +171,23 @@ export async function run(): Promise<void> {
     core.setOutput("ok", String(result.ok));
 
     if (hasCoverage) await core.summary.addRaw(renderStepSummary(commentInput)).write();
+
+    if (hasCoverage && inputs.serverUrl && inputs.serverToken) {
+      const uploaded = await uploadCoverageFiles({
+        serverUrl: inputs.serverUrl,
+        token: inputs.serverToken,
+        files: inputs.files,
+        repo: `${github.context.repo.owner}/${github.context.repo.repo}`,
+        branch:
+          (github.context.payload.pull_request?.head?.ref as string | undefined) ??
+          github.context.ref.replace(/^refs\/heads\//, ""),
+        commit:
+          (github.context.payload.pull_request?.head?.sha as string | undefined) ??
+          github.context.sha,
+        pr: prNumber ?? null,
+      });
+      core.info(`Uploaded ${uploaded} coverage ${uploaded === 1 ? "file" : "files"} to Covallaby.`);
+    }
 
     if (inputs.playwrightResults) {
       if (!inputs.serverUrl || !inputs.serverToken)
