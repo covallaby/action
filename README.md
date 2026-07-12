@@ -198,6 +198,7 @@ Multiple files merge automatically (test shards, mixed suites):
 | `github-token` | Token for comments/checks/statuses. | `github.token` |
 | `server-url` | Covallaby server used for hosted coverage, browser runs, and Storybook previews. | off |
 | `server-token` | Per-repo or admin upload token for that server. When both server inputs are set, coverage files are stored in the hosted dashboard. | off |
+| `storybook-capture` | Capture each story from `index.json` as an image: `auto`, `required`, or `off`. | `auto` |
 | `playwright-results` | Playwright JSON reporter output; enables browser playbacks. | off |
 | `playwright-artifacts` | Extra files/directories such as `test-results`. | off |
 

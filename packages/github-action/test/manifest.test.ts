@@ -40,6 +40,7 @@ describe("action.yml", () => {
       "playwright-results",
       "playwright-artifacts",
       "storybook-dir",
+      "storybook-capture",
     ];
     expect(Object.keys(manifest.inputs)).toEqual(expected);
     for (const [name, input] of Object.entries<{ description?: unknown }>(manifest.inputs)) {

@@ -227,10 +227,18 @@ export async function run(): Promise<void> {
           github.context.ref.replace(/^refs\/heads\//, ""),
         commit: github.context.sha,
         pr: prNumber ?? null,
+        captureMode: inputs.storybookCapture,
       });
       core.setOutput("storybook-url", preview.url);
-      commentInput.storybook = { url: preview.url, files: preview.files };
+      commentInput.storybook = {
+        url: preview.url,
+        files: preview.files,
+        captures: preview.captures,
+      };
       core.info(`Uploaded ${preview.files} Storybook files: ${preview.url}`);
+      if (preview.captureSkipped)
+        core.warning(`Storybook image capture skipped: ${preview.captureSkipped}`);
+      else core.info(`Captured ${preview.captures} individual Storybook stories.`);
       await core.summary.addRaw(renderStepSummary(commentInput)).write({ overwrite: true });
     }
 

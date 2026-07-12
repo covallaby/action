@@ -1,6 +1,7 @@
 import { createReadStream } from "node:fs";
 import { readdir, realpath, stat } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { captureStorybook } from "./storybook-capture.js";
 
 export interface StorybookUploadOptions {
   serverUrl: string;
@@ -11,6 +12,7 @@ export interface StorybookUploadOptions {
   commit: string;
   pr: number | null;
   fetch?: typeof globalThis.fetch;
+  captureMode?: "auto" | "required" | "off";
 }
 
 const MIME: Record<string, string> = {
@@ -53,9 +55,11 @@ async function filesUnder(path: string, root: string): Promise<string[]> {
 
 export async function uploadStorybookPreview(
   options: StorybookUploadOptions,
-): Promise<{ id: number; url: string; files: number }> {
+): Promise<{ id: number; url: string; files: number; captures: number; captureSkipped?: string }> {
   const fetcher = options.fetch ?? globalThis.fetch;
   const root = await realpath(resolve(options.directory));
+  const capture = await captureStorybook(root, options.captureMode ?? "auto");
+  const capturesByPath = new Map(capture.captures.map((story) => [story.path, story]));
   const paths = await filesUnder(root, root);
   const files = await Promise.all(
     paths.map(async (path) => ({
@@ -63,6 +67,10 @@ export async function uploadStorybookPreview(
       relativePath: relative(root, path).split(sep).join("/"),
       contentType: MIME[extname(path).toLowerCase()] ?? "application/octet-stream",
       sizeBytes: (await stat(path)).size,
+      ...(capturesByPath.has(relative(root, path).split(sep).join("/")) && {
+        kind: "screenshot",
+        testName: JSON.stringify(capturesByPath.get(relative(root, path).split(sep).join("/"))),
+      }),
     })),
   );
   if (!files.some((file) => file.relativePath === "index.html")) {
@@ -144,5 +152,7 @@ export async function uploadStorybookPreview(
     id: manifest.run.id,
     url: new URL(manifest.url, options.serverUrl).toString(),
     files: files.length,
+    captures: capture.captures.length,
+    ...(capture.skipped && { captureSkipped: capture.skipped }),
   };
 }

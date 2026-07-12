@@ -18,6 +18,7 @@ export interface ActionInputs {
   playwrightResults?: string;
   playwrightArtifacts: string[];
   storybookDir?: string;
+  storybookCapture: "auto" | "required" | "off";
 }
 
 export interface RawInputs {
@@ -39,6 +40,12 @@ function parseBreakdown(raw: string): number | "auto" | "off" {
   const depth = Number(value);
   if (Number.isInteger(depth) && depth >= 1) return depth;
   throw new Error(`\`breakdown\` must be "auto", "off", or a directory depth (1+), got "${raw}".`);
+}
+
+function parseStorybookCapture(raw: string): "auto" | "required" | "off" {
+  const value = raw.trim().toLowerCase() || "auto";
+  if (value === "auto" || value === "required" || value === "off") return value;
+  throw new Error(`\`storybook-capture\` must be "auto", "required", or "off", got "${raw}".`);
 }
 
 function parsePercent(raw: string, name: string): number | undefined {
@@ -118,5 +125,6 @@ export function parseInputs(raw: RawInputs, workspace: string): ActionInputs {
       .map((p) => p.trim())
       .filter(Boolean),
     ...(storybookDir && { storybookDir }),
+    storybookCapture: parseStorybookCapture(raw.getInput("storybook-capture")),
   };
 }
