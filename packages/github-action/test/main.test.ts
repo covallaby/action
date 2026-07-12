@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const uploadCoverageFiles = vi.hoisted(() => vi.fn().mockResolvedValue(2));
+
 const inputs: Record<string, string> = {};
 const addRaw = vi.fn();
 const write = vi.fn();
@@ -42,10 +44,12 @@ vi.mock("../src/playwright.js", () => ({
 }));
 
 vi.mock("../src/storybook.js", () => ({ uploadStorybookPreview: vi.fn() }));
+vi.mock("../src/coverage-upload.js", () => ({ uploadCoverageFiles }));
 
 describe("run", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const key of Object.keys(inputs)) delete inputs[key];
     Object.assign(inputs, {
       "server-url": "https://app.covallaby.com",
       "server-token": "secret",
@@ -81,5 +85,36 @@ describe("run", () => {
         body: expect.stringContaining("Browser playback"),
       }),
     );
+  });
+
+  it("publishes coverage files to the configured hosted server", async () => {
+    Object.assign(inputs, {
+      files: "packages/parsers/fixtures/lcov/basic.info, packages/parsers/fixtures/lcov/basic.info",
+      "server-url": "https://app.covallaby.com",
+      "server-token": "secret",
+      comment: "update",
+      check: "true",
+      annotations: "true",
+      statuses: "true",
+    });
+    const core = await import("@actions/core");
+    const { run } = await import("../src/main.js");
+
+    await run();
+
+    expect(core.setFailed).not.toHaveBeenCalled();
+    expect(uploadCoverageFiles).toHaveBeenCalledWith({
+      serverUrl: "https://app.covallaby.com",
+      token: "secret",
+      files: [
+        "packages/parsers/fixtures/lcov/basic.info",
+        "packages/parsers/fixtures/lcov/basic.info",
+      ],
+      repo: "acme/web",
+      branch: "visuals",
+      commit: "abc123",
+      pr: 42,
+    });
+    expect(core.info).toHaveBeenCalledWith("Uploaded 2 coverage files to Covallaby.");
   });
 });

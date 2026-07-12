@@ -13046,7 +13046,7 @@ var require_fetch = __commonJS({
         this.emit("terminated", error);
       }
     };
-    function fetch(input, init = {}) {
+    function fetch2(input, init = {}) {
       webidl.argumentLengthCheck(arguments, 1, { header: "globalThis.fetch" });
       const p = createDeferredPromise();
       let requestObject;
@@ -13976,7 +13976,7 @@ var require_fetch = __commonJS({
       }
     }
     module2.exports = {
-      fetch,
+      fetch: fetch2,
       Fetch,
       fetching,
       finalizeAndReportTiming
@@ -17232,7 +17232,7 @@ var require_undici = __commonJS({
     module2.exports.getGlobalDispatcher = getGlobalDispatcher;
     if (util.nodeMajor > 16 || util.nodeMajor === 16 && util.nodeMinor >= 8) {
       let fetchImpl = null;
-      module2.exports.fetch = async function fetch(resource) {
+      module2.exports.fetch = async function fetch2(resource) {
         if (!fetchImpl) {
           fetchImpl = require_fetch().fetch;
         }
@@ -20708,16 +20708,16 @@ var require_dist_node5 = __commonJS({
       let headers = {};
       let status;
       let url;
-      let { fetch } = globalThis;
+      let { fetch: fetch2 } = globalThis;
       if ((_b = requestOptions.request) == null ? void 0 : _b.fetch) {
-        fetch = requestOptions.request.fetch;
+        fetch2 = requestOptions.request.fetch;
       }
-      if (!fetch) {
+      if (!fetch2) {
         throw new Error(
           "fetch is not set. Please pass a fetch implementation as new Octokit({ request: { fetch }}). Learn more at https://github.com/octokit/octokit.js/#fetch-missing"
         );
       }
-      return fetch(requestOptions.url, {
+      return fetch2(requestOptions.url, {
         method: requestOptions.method,
         body: requestOptions.body,
         redirect: (_c = requestOptions.request) == null ? void 0 : _c.redirect,
@@ -26907,6 +26907,33 @@ function renderStepSummary(input) {
 `, "");
 }
 
+// src/coverage-upload.ts
+var import_promises = require("node:fs/promises");
+async function uploadCoverageFiles(input) {
+  let uploaded = 0;
+  for (const file of input.files) {
+    const url = new URL("/api/v1/upload", `${input.serverUrl}/`);
+    url.searchParams.set("repo", input.repo);
+    url.searchParams.set("branch", input.branch);
+    url.searchParams.set("commit", input.commit);
+    if (input.pr !== null) url.searchParams.set("pr", String(input.pr));
+    if (uploaded > 0) url.searchParams.set("merge", "1");
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${input.token}` },
+      body: await (0, import_promises.readFile)(file)
+    });
+    if (!response.ok) {
+      const detail = (await response.text()).trim();
+      throw new Error(
+        `Hosted coverage upload failed for "${file}" (${response.status})${detail ? `: ${detail}` : "."}`
+      );
+    }
+    uploaded += 1;
+  }
+  return uploaded;
+}
+
 // src/inputs.ts
 function parseSwitch(raw, name, fallback) {
   const value = raw.trim().toLowerCase();
@@ -26987,7 +27014,7 @@ function parseInputs(raw, workspace) {
 
 // src/playwright.ts
 var import_node_fs = require("node:fs");
-var import_promises = require("node:fs/promises");
+var import_promises2 = require("node:fs/promises");
 var import_node_path = require("node:path");
 var MIME = {
   ".webm": "video/webm",
@@ -27017,11 +27044,11 @@ var isWithin = (path, root) => {
   return fromRoot === "" || fromRoot !== ".." && !fromRoot.startsWith(`..${import_node_path.sep}`) && !(0, import_node_path.isAbsolute)(fromRoot);
 };
 async function filesUnder(path, root = path) {
-  const actual = await (0, import_promises.realpath)(path);
+  const actual = await (0, import_promises2.realpath)(path);
   if (!isWithin(actual, root)) return [];
-  const info2 = await (0, import_promises.stat)(actual);
+  const info2 = await (0, import_promises2.stat)(actual);
   if (info2.isFile()) return [actual];
-  const entries = await (0, import_promises.readdir)(actual, { withFileTypes: true });
+  const entries = await (0, import_promises2.readdir)(actual, { withFileTypes: true });
   const nested = await Promise.all(
     entries.map((entry) => filesUnder((0, import_node_path.resolve)(actual, entry.name), root))
   );
@@ -27068,15 +27095,15 @@ function testMetadata(json) {
 async function uploadPlaywrightRun(options) {
   const fetcher = options.fetch ?? globalThis.fetch;
   const resultsPath = (0, import_node_path.resolve)(options.resultsPath);
-  const results = JSON.parse(await (0, import_promises.readFile)(resultsPath, "utf8"));
+  const results = JSON.parse(await (0, import_promises2.readFile)(resultsPath, "utf8"));
   const meta = testMetadata(results);
-  const discovered = /* @__PURE__ */ new Set([await (0, import_promises.realpath)(resultsPath)]);
-  const roots = await Promise.all(options.artifactPaths.map((path) => (0, import_promises.realpath)((0, import_node_path.resolve)(path))));
+  const discovered = /* @__PURE__ */ new Set([await (0, import_promises2.realpath)(resultsPath)]);
+  const roots = await Promise.all(options.artifactPaths.map((path) => (0, import_promises2.realpath)((0, import_node_path.resolve)(path))));
   for (const root of roots) for (const file of await filesUnder(root)) discovered.add(file);
   const attachmentNames = /* @__PURE__ */ new Map();
   for (const [path, testName] of meta.names) {
     try {
-      const actual = await (0, import_promises.realpath)(path);
+      const actual = await (0, import_promises2.realpath)(path);
       if (roots.some((root) => isWithin(actual, root))) {
         discovered.add(actual);
         attachmentNames.set(actual, testName);
@@ -27086,7 +27113,7 @@ async function uploadPlaywrightRun(options) {
   }
   const files = [];
   for (const path of discovered) {
-    const info2 = await (0, import_promises.stat)(path);
+    const info2 = await (0, import_promises2.stat)(path);
     files.push({
       path,
       name: (0, import_node_path.basename)(path),
@@ -27174,7 +27201,7 @@ async function uploadPlaywrightRun(options) {
 
 // src/storybook.ts
 var import_node_fs2 = require("node:fs");
-var import_promises2 = require("node:fs/promises");
+var import_promises3 = require("node:fs/promises");
 var import_node_path2 = require("node:path");
 var MIME2 = {
   ".css": "text/css",
@@ -27199,23 +27226,23 @@ var isWithin2 = (path, root) => {
   return fromRoot === "" || fromRoot !== ".." && !fromRoot.startsWith(`..${import_node_path2.sep}`) && !(0, import_node_path2.isAbsolute)(fromRoot);
 };
 async function filesUnder2(path, root) {
-  const actual = await (0, import_promises2.realpath)(path);
+  const actual = await (0, import_promises3.realpath)(path);
   if (!isWithin2(actual, root)) return [];
-  const info2 = await (0, import_promises2.stat)(actual);
+  const info2 = await (0, import_promises3.stat)(actual);
   if (info2.isFile()) return [actual];
-  const entries = await (0, import_promises2.readdir)(actual, { withFileTypes: true });
+  const entries = await (0, import_promises3.readdir)(actual, { withFileTypes: true });
   return (await Promise.all(entries.map((entry) => filesUnder2((0, import_node_path2.resolve)(actual, entry.name), root)))).flat();
 }
 async function uploadStorybookPreview(options) {
   const fetcher = options.fetch ?? globalThis.fetch;
-  const root = await (0, import_promises2.realpath)((0, import_node_path2.resolve)(options.directory));
+  const root = await (0, import_promises3.realpath)((0, import_node_path2.resolve)(options.directory));
   const paths = await filesUnder2(root, root);
   const files = await Promise.all(
     paths.map(async (path) => ({
       path,
       relativePath: (0, import_node_path2.relative)(root, path).split(import_node_path2.sep).join("/"),
       contentType: MIME2[(0, import_node_path2.extname)(path).toLowerCase()] ?? "application/octet-stream",
-      sizeBytes: (await (0, import_promises2.stat)(path)).size
+      sizeBytes: (await (0, import_promises3.stat)(path)).size
     }))
   );
   if (!files.some((file) => file.relativePath === "index.html")) {
@@ -27408,6 +27435,18 @@ async function run() {
     core.setOutput("uncovered-lines", String(summary2.lines.total - summary2.lines.covered));
     core.setOutput("ok", String(result.ok));
     if (hasCoverage) await core.summary.addRaw(renderStepSummary(commentInput)).write();
+    if (hasCoverage && inputs.serverUrl && inputs.serverToken) {
+      const uploaded = await uploadCoverageFiles({
+        serverUrl: inputs.serverUrl,
+        token: inputs.serverToken,
+        files: inputs.files,
+        repo: `${github.context.repo.owner}/${github.context.repo.repo}`,
+        branch: github.context.payload.pull_request?.head?.ref ?? github.context.ref.replace(/^refs\/heads\//, ""),
+        commit: github.context.payload.pull_request?.head?.sha ?? github.context.sha,
+        pr: prNumber ?? null
+      });
+      core.info(`Uploaded ${uploaded} coverage ${uploaded === 1 ? "file" : "files"} to Covallaby.`);
+    }
     if (inputs.playwrightResults) {
       if (!inputs.serverUrl || !inputs.serverToken)
         throw new Error(
