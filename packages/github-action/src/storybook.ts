@@ -2,6 +2,7 @@ import { createReadStream } from "node:fs";
 import { readdir, realpath, stat } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { captureStorybook } from "./storybook-capture.js";
+import type { StoryCapture } from "./storybook-capture.js";
 
 export interface StorybookUploadOptions {
   serverUrl: string;
@@ -13,6 +14,7 @@ export interface StorybookUploadOptions {
   pr: number | null;
   fetch?: typeof globalThis.fetch;
   captureMode?: "auto" | "required" | "off";
+  captures?: StoryCapture[];
 }
 
 const MIME: Record<string, string> = {
@@ -58,7 +60,9 @@ export async function uploadStorybookPreview(
 ): Promise<{ id: number; url: string; files: number; captures: number; captureSkipped?: string }> {
   const fetcher = options.fetch ?? globalThis.fetch;
   const root = await realpath(resolve(options.directory));
-  const capture = await captureStorybook(root, options.captureMode ?? "auto");
+  const capture = options.captures
+    ? { captures: options.captures }
+    : await captureStorybook(root, options.captureMode ?? "auto");
   const capturesByPath = new Map(capture.captures.map((story) => [story.path, story]));
   const paths = await filesUnder(root, root);
   const files = await Promise.all(

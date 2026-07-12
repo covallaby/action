@@ -3,9 +3,34 @@ import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { captureStorybook, readStoryIndex } from "../src/storybook-capture.js";
+import {
+  captureStorybook,
+  prepareComponentCaptures,
+  readStoryIndex,
+} from "../src/storybook-capture.js";
 
 describe("Storybook story discovery", () => {
+  it("packages pre-rendered PNG directories as fingerprinted component captures", async () => {
+    const root = fileURLToPath(new URL("./fixtures/playwright", import.meta.url));
+    const prepared = await prepareComponentCaptures(root);
+    try {
+      expect(prepared.captures).toEqual([
+        expect.objectContaining({
+          id: "screenshot",
+          title: "Components",
+          name: "screenshot",
+          path: expect.stringMatching(/^_covallaby\/captures\/.*\.png$/),
+          sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
+      ]);
+      expect(await readFile(join(prepared.directory, "index.html"), "utf8")).toContain(
+        "Review these captures in Covallaby",
+      );
+    } finally {
+      await prepared.cleanup();
+    }
+  });
+
   it("uses index.json as the authoritative capture list and excludes docs entries", async () => {
     const root = fileURLToPath(new URL("./fixtures/storybook", import.meta.url));
     const stories = await readStoryIndex(root);

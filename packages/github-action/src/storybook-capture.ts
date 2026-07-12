@@ -1,7 +1,18 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:http";
-import { extname, join, relative, resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import puppeteer from "puppeteer-core";
 
 export interface StoryCapture {
@@ -10,6 +21,59 @@ export interface StoryCapture {
   name: string;
   path: string;
   sha256?: string;
+}
+
+async function pngsUnder(path: string): Promise<string[]> {
+  const info = await stat(path);
+  if (info.isFile()) return extname(path).toLowerCase() === ".png" ? [path] : [];
+  const entries = await readdir(path, { withFileTypes: true });
+  return (await Promise.all(entries.map((entry) => pngsUnder(join(path, entry.name))))).flat();
+}
+
+export async function prepareComponentCaptures(directory: string): Promise<{
+  directory: string;
+  captures: StoryCapture[];
+  cleanup(): Promise<void>;
+}> {
+  const source = resolve(directory);
+  const paths = (await pngsUnder(source)).sort().slice(0, 250);
+  if (paths.length === 0) throw new Error(`Component capture directory ${directory} has no PNGs.`);
+  const output = await mkdtemp(join(tmpdir(), "covallaby-component-captures-"));
+  await mkdir(join(output, "_covallaby", "captures"), { recursive: true });
+  const captures = await Promise.all(
+    paths.map(async (path, index) => {
+      const fromRoot = relative(source, path).split(sep).join("/");
+      const id = fromRoot
+        .replace(/\.png$/i, "")
+        .replace(/[^a-zA-Z0-9_.-]+/g, "-")
+        .toLowerCase();
+      const targetName = `${String(index + 1).padStart(3, "0")}-${id}.png`;
+      const capturePath = `_covallaby/captures/${targetName}`;
+      await copyFile(path, join(output, capturePath));
+      return {
+        id,
+        title: dirname(fromRoot) === "." ? "Components" : dirname(fromRoot).replaceAll("/", " / "),
+        name: basename(fromRoot, extname(fromRoot)).replaceAll(/[-_]+/g, " "),
+        path: capturePath,
+        sha256: createHash("sha256")
+          .update(await readFile(path))
+          .digest("hex"),
+      };
+    }),
+  );
+  await writeFile(
+    join(output, "index.html"),
+    "<!doctype html><meta charset=utf-8><title>Covallaby component captures</title><p>Review these captures in Covallaby.</p>",
+  );
+  await writeFile(
+    join(output, "_covallaby", "stories.json"),
+    JSON.stringify({ version: 1, stories: captures }, null, 2),
+  );
+  return {
+    directory: output,
+    captures,
+    cleanup: () => rm(output, { recursive: true, force: true }),
+  };
 }
 
 const CHROME_CANDIDATES = [

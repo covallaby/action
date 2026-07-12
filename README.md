@@ -198,6 +198,7 @@ Multiple files merge automatically (test shards, mixed suites):
 | `github-token` | Token for comments/checks/statuses. | `github.token` |
 | `server-url` | Covallaby server used for hosted coverage, browser runs, and Storybook previews. | off |
 | `server-token` | Per-repo or admin upload token for that server. When both server inputs are set, coverage files are stored in the hosted dashboard. | off |
+| `component-captures` | Directory of pre-rendered PNGs from Phoenix Storybook, Lost Pixel, or another visual runner. | off |
 | `storybook-capture` | Capture each story from `index.json` as an image: `auto`, `required`, or `off`. | `auto` |
 | `playwright-results` | Playwright JSON reporter output; enables browser playbacks. | off |
 | `playwright-artifacts` | Extra files/directories such as `test-results`. | off |
@@ -259,6 +260,21 @@ Covallaby uploads the files directly to private object storage and adds an
 isolated, interactive Storybook preview to its sticky PR comment, Step Summary,
 and dashboard. The server must configure a separate `COVALLABY_PREVIEW_BASE_URL`
 origin so repository-controlled preview code never runs with dashboard access.
+
+Already have a visual runner producing PNGs? Publish those directly without rebuilding or
+recapturing them:
+
+```yaml
+- uses: covallaby/action@main
+  if: always()
+  with:
+    server-url: https://app.covallaby.com
+    server-token: ${{ secrets.COVALLABY_TOKEN }}
+    component-captures: .lostpixel/current
+```
+
+Covallaby fingerprints the images, uses the preceding successful `main` run as the baseline,
+and provides changed/new/removed filtering plus side-by-side, overlay, and pixel-diff review.
 
 ## CLI
 
