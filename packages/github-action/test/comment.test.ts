@@ -180,6 +180,18 @@ describe("parseInputs", () => {
     expect(comment).toContain("[Explore this build in Covallaby]");
     expect(comment).toContain("42 files");
   });
+
+  it("links captured stories to visual review", () => {
+    const comment = renderComment({
+      ...build({}),
+      storybook: {
+        url: "https://app.covallaby.com/r/acme/app/storybook-previews/9",
+        files: 45,
+        captures: 12,
+      },
+    });
+    expect(comment).toContain("Review 12 component captures and visual diffs");
+  });
 });
 
 describe("renderComment path safety", () => {

@@ -35,6 +35,7 @@ describe("Storybook story discovery", () => {
         expect(result.captures.length).toBeGreaterThan(1);
         const png = await readFile(join(root, result.captures[0]!.path));
         expect([...png.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+        expect(result.captures[0]!.sha256).toMatch(/^[a-f0-9]{64}$/);
         expect(await readFile(join(root, "_covallaby/stories.json"), "utf8")).toContain(
           result.captures[0]!.id,
         );

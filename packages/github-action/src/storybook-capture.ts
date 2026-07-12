@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, relative, resolve, sep } from "node:path";
@@ -8,6 +9,7 @@ export interface StoryCapture {
   title: string;
   name: string;
   path: string;
+  sha256?: string;
 }
 
 const CHROME_CANDIDATES = [
@@ -135,6 +137,7 @@ export async function captureStorybook(
           const page = await browser.newPage();
           try {
             await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
+            await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
             await page.goto(
               `${url}/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`,
               {
@@ -147,6 +150,17 @@ export async function captureStorybook(
               timeout: 20_000,
             });
             if (!root) throw new Error(`Story ${story.id} did not render a root element.`);
+            await page.addStyleTag({
+              content: `
+                *, *::before, *::after {
+                  animation-delay: 0s !important;
+                  animation-duration: 0s !important;
+                  caret-color: transparent !important;
+                  transition-delay: 0s !important;
+                  transition-duration: 0s !important;
+                }
+              `,
+            });
             await page.evaluate(`(async () => {
               await document.fonts.ready;
               await Promise.all([...document.images]
@@ -155,8 +169,13 @@ export async function captureStorybook(
                   image.addEventListener("load", done, { once: true });
                   image.addEventListener("error", done, { once: true });
                 })));
+              await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
             })()`);
-            await root.screenshot({ path: join(directory, story.path) });
+            const path = join(directory, story.path);
+            await root.screenshot({ path });
+            story.sha256 = createHash("sha256")
+              .update(await readFile(path))
+              .digest("hex");
           } finally {
             await page.close();
           }
