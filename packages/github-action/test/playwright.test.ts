@@ -6,6 +6,88 @@ import { describe, expect, it } from "vitest";
 import { uploadPlaywrightRun } from "../src/playwright.js";
 
 describe("Playwright playback upload", () => {
+  it("uploads inline screenshot attachments as named journey steps", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "covallaby-playwright-inline-"));
+    const results = join(dir, "results.json");
+    await writeFile(
+      results,
+      JSON.stringify({
+        suites: [
+          {
+            title: "onboarding.flow.spec.ts",
+            specs: [
+              {
+                title: "new customer activates a dashboard",
+                tests: [
+                  {
+                    results: [
+                      {
+                        status: "passed",
+                        duration: 120,
+                        attachments: [
+                          {
+                            name: "01-welcome",
+                            contentType: "image/png",
+                            body: Buffer.from("png bytes").toString("base64"),
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    let manifestArtifacts: Array<Record<string, unknown>> = [];
+    let screenshotBody = "";
+
+    await uploadPlaywrightRun({
+      serverUrl: "https://app.example",
+      token: "secret",
+      resultsPath: results,
+      artifactPaths: [],
+      repo: "acme/app",
+      branch: "main",
+      commit: "abc",
+      pr: null,
+      fetch: (async (input, init = {}) => {
+        const url = String(input);
+        if (url.endsWith("/api/v1/test-runs")) {
+          const body = JSON.parse(String(init.body)) as {
+            artifacts: Array<Record<string, unknown>>;
+          };
+          manifestArtifacts = body.artifacts;
+          return Response.json(
+            {
+              run: { id: 10 },
+              artifacts: body.artifacts.map((_, index) => ({
+                uploadUrl: `https://objects.example/${index}`,
+              })),
+              url: "/run/10",
+            },
+            { status: 201 },
+          );
+        }
+        if (url === "https://objects.example/1")
+          screenshotBody = Buffer.from(init.body as Uint8Array).toString();
+        return new Response(null, { status: 200 });
+      }) as typeof fetch,
+    });
+
+    expect(manifestArtifacts[1]).toMatchObject({
+      name: "01-welcome.png",
+      kind: "screenshot",
+      contentType: "image/png",
+      testName: "onboarding.flow.spec.ts › new customer activates a dashboard",
+      sizeBytes: 9,
+    });
+    expect(manifestArtifacts[1]).not.toHaveProperty("body");
+    expect(screenshotBody).toBe("png bytes");
+  });
+
   it("keeps test names attached and uploads directly to signed storage", async () => {
     const dir = fileURLToPath(new URL("./fixtures/playwright", import.meta.url));
     const results = join(dir, "results.json");
