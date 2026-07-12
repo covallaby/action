@@ -18,6 +18,7 @@ describe("Storybook preview upload", () => {
       commit: "abc",
       pr: 9,
       captureMode: "off",
+      captures: [],
       fetch: (async (input, init = {}) => {
         const url = String(input);
         calls.push({
@@ -55,7 +56,6 @@ describe("Storybook preview upload", () => {
       url: "https://app.example/r/acme/app/storybook-previews/8",
       files: 30,
       captures: 0,
-      captureSkipped: "disabled",
     });
     expect(
       calls.find((call) => call.url.includes("objects.example"))?.authorization,
