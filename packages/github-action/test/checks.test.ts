@@ -1,7 +1,13 @@
 import { type PatchSummary, checkThresholds, summarize } from "@covallaby/core";
 import { parseLcov } from "@covallaby/parsers";
 import { describe, expect, it } from "vitest";
-import { buildAnnotations, buildCheckRun, buildStatuses } from "../src/checks.js";
+import {
+  buildAnnotations,
+  buildCheckRun,
+  buildComponentsStatus,
+  buildJourneysStatus,
+  buildStatuses,
+} from "../src/checks.js";
 
 const summary = summarize(parseLcov("SF:src/a.ts\nDA:1,1\nDA:2,1\nDA:3,0\nDA:4,1\nend_of_record"));
 
@@ -42,6 +48,67 @@ describe("buildStatuses", () => {
     const empty: PatchSummary = { lines: { covered: 0, total: 0, percent: null }, files: [] };
     const statuses = buildStatuses(summary, empty, {}, checkThresholds(summary, {}, empty));
     expect(statuses.map((s) => s.context)).toEqual(["covallaby/project"]);
+  });
+
+  it("deep-links every coverage status to the hosted upload page", () => {
+    const url = "https://app.covallaby.com/r/acme/app/u/12";
+    const result = checkThresholds(summary, {}, patch);
+    for (const status of buildStatuses(summary, patch, {}, result, url)) {
+      expect(status.targetUrl).toBe(url);
+    }
+  });
+});
+
+describe("buildJourneysStatus", () => {
+  const url = "https://app.covallaby.com/r/acme/app/test-runs/42";
+
+  it("passes with the run's outcome and deep link", () => {
+    expect(buildJourneysStatus({ url, tests: { passed: 8, failed: 0, skipped: 2 } })).toEqual({
+      context: "covallaby/journeys",
+      state: "success",
+      description: "8 journeys passed (2 skipped)",
+      targetUrl: url,
+    });
+  });
+
+  it("fails when any journey failed", () => {
+    expect(buildJourneysStatus({ url, tests: { passed: 6, failed: 2, skipped: 0 } })).toEqual({
+      context: "covallaby/journeys",
+      state: "failure",
+      description: "2 of 8 journeys failed",
+      targetUrl: url,
+    });
+  });
+});
+
+describe("buildComponentsStatus", () => {
+  const url = "https://app.covallaby.com/r/acme/app/storybook-previews/9";
+
+  it("is pending while captures await review", () => {
+    expect(buildComponentsStatus({ url, captures: 3, reviewState: "pending" })).toEqual({
+      context: "covallaby/components",
+      state: "pending",
+      description: "3 component captures await visual review",
+      targetUrl: url,
+    });
+  });
+
+  it("fails on rejection and succeeds on approval or mainline auto-accept", () => {
+    expect(buildComponentsStatus({ url, captures: 3, reviewState: "rejected" }).state).toBe(
+      "failure",
+    );
+    expect(buildComponentsStatus({ url, captures: 3, reviewState: "approved" }).state).toBe(
+      "success",
+    );
+    expect(buildComponentsStatus({ url, captures: 3, reviewState: "auto-accepted" }).state).toBe(
+      "success",
+    );
+  });
+
+  it("succeeds when a build shipped without captures — nothing to review", () => {
+    const status = buildComponentsStatus({ url, captures: 0, reviewState: "pending" });
+    expect(status.state).toBe("success");
+    expect(status.description).toContain("no captures");
   });
 });
 

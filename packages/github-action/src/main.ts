@@ -14,7 +14,13 @@ import {
   summarize,
 } from "@covallaby/core";
 import { type CoverageFormat, parseCoverage } from "@covallaby/parsers";
-import { buildAnnotations, buildCheckRun, buildStatuses } from "./checks.js";
+import {
+  buildAnnotations,
+  buildCheckRun,
+  buildComponentsStatus,
+  buildJourneysStatus,
+  buildStatuses,
+} from "./checks.js";
 import { COMMENT_MARKER, type CommentInput, renderComment, renderStepSummary } from "./comment.js";
 import { uploadCoverageFiles } from "./coverage-upload.js";
 import { parseInputs } from "./inputs.js";
@@ -174,6 +180,13 @@ export async function run(): Promise<void> {
 
     if (hasCoverage) await core.summary.addRaw(renderStepSummary(commentInput)).write();
 
+    // Signals report against the PR head SHA (not the ephemeral merge commit):
+    // that's the SHA the PR checks list shows, and it joins the coverage
+    // upload, journey run, and component preview into one commit envelope.
+    const commitSha =
+      (github.context.payload.pull_request?.head?.sha as string | undefined) ?? github.context.sha;
+
+    let coverageUrl: string | undefined;
     if (hasCoverage && inputs.serverUrl && inputs.serverToken) {
       const uploaded = await uploadCoverageFiles({
         serverUrl: inputs.serverUrl,
@@ -183,20 +196,25 @@ export async function run(): Promise<void> {
         branch:
           (github.context.payload.pull_request?.head?.ref as string | undefined) ??
           github.context.ref.replace(/^refs\/heads\//, ""),
-        commit:
-          (github.context.payload.pull_request?.head?.sha as string | undefined) ??
-          github.context.sha,
+        commit: commitSha,
         pr: prNumber ?? null,
       });
-      core.info(`Uploaded ${uploaded} coverage ${uploaded === 1 ? "file" : "files"} to Covallaby.`);
+      if (uploaded.url) {
+        coverageUrl = uploaded.url;
+        commentInput.coverage = { url: uploaded.url };
+      }
+      core.info(
+        `Uploaded ${uploaded.uploaded} coverage ${uploaded.uploaded === 1 ? "file" : "files"} to Covallaby.`,
+      );
     }
 
+    let playback: Awaited<ReturnType<typeof uploadPlaywrightRun>> | null = null;
     if (inputs.playwrightResults) {
       if (!inputs.serverUrl || !inputs.serverToken)
         throw new Error(
           "`server-url` and `server-token` are required when `playwright-results` is set.",
         );
-      const playback = await uploadPlaywrightRun({
+      playback = await uploadPlaywrightRun({
         serverUrl: inputs.serverUrl,
         token: inputs.serverToken,
         resultsPath: inputs.playwrightResults,
@@ -205,7 +223,7 @@ export async function run(): Promise<void> {
         branch:
           (github.context.payload.pull_request?.head?.ref as string | undefined) ??
           github.context.ref.replace(/^refs\/heads\//, ""),
-        commit: github.context.sha,
+        commit: commitSha,
         pr: prNumber ?? null,
       });
       core.setOutput("playback-url", playback.url);
@@ -214,6 +232,7 @@ export async function run(): Promise<void> {
       await core.summary.addRaw(renderStepSummary(commentInput)).write({ overwrite: true });
     }
 
+    let preview: Awaited<ReturnType<typeof uploadStorybookPreview>> | null = null;
     if (inputs.storybookDir || inputs.componentCaptures) {
       if (!inputs.serverUrl || !inputs.serverToken)
         throw new Error(
@@ -223,7 +242,7 @@ export async function run(): Promise<void> {
         ? await prepareComponentCaptures(inputs.componentCaptures)
         : null;
       try {
-        const preview = await uploadStorybookPreview({
+        preview = await uploadStorybookPreview({
           serverUrl: inputs.serverUrl,
           token: inputs.serverToken,
           directory: prepared?.directory ?? inputs.storybookDir!,
@@ -231,7 +250,7 @@ export async function run(): Promise<void> {
           branch:
             (github.context.payload.pull_request?.head?.ref as string | undefined) ??
             github.context.ref.replace(/^refs\/heads\//, ""),
-          commit: github.context.sha,
+          commit: commitSha,
           pr: prNumber ?? null,
           captureMode: prepared ? "off" : inputs.storybookCapture,
           ...(prepared && { captures: prepared.captures }),
@@ -265,6 +284,8 @@ export async function run(): Promise<void> {
           head_sha: headSha,
           status: "completed",
           conclusion: checkRun.conclusion,
+          // Deep link to the commit's coverage page on the dashboard.
+          ...(coverageUrl && { details_url: coverageUrl }),
           output: {
             title: checkRun.title,
             summary: renderStepSummary(commentInput),
@@ -305,9 +326,15 @@ export async function run(): Promise<void> {
       }
     }
 
-    // Named entries in the PR checks list, individually requirable.
-    if (hasCoverage && inputs.statuses && octokit && headSha) {
-      for (const status of buildStatuses(summary, patch, inputs.thresholds, result)) {
+    // Named entries in the PR checks list, one per signal, individually
+    // requirable — each deep-linking to its page for this commit.
+    if (inputs.statuses && octokit && headSha) {
+      const statuses = hasCoverage
+        ? buildStatuses(summary, patch, inputs.thresholds, result, coverageUrl)
+        : [];
+      if (playback) statuses.push(buildJourneysStatus(playback));
+      if (preview) statuses.push(buildComponentsStatus(preview));
+      for (const status of statuses) {
         try {
           await octokit.rest.repos.createCommitStatus({
             ...github.context.repo,
@@ -315,6 +342,7 @@ export async function run(): Promise<void> {
             context: status.context,
             state: status.state,
             description: status.description,
+            ...(status.targetUrl && { target_url: status.targetUrl }),
           });
         } catch (error) {
           core.warning(

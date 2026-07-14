@@ -148,9 +148,12 @@ function testMetadata(json: PlaywrightJson): {
   return { passed, failed, skipped, durationMs, names, inline };
 }
 
-export async function uploadPlaywrightRun(
-  options: PlaybackOptions,
-): Promise<{ id: number; url: string; artifacts: number }> {
+export async function uploadPlaywrightRun(options: PlaybackOptions): Promise<{
+  id: number;
+  url: string;
+  artifacts: number;
+  tests: { passed: number; failed: number; skipped: number };
+}> {
   const fetcher = options.fetch ?? globalThis.fetch;
   const resultsPath = resolve(options.resultsPath);
   const results = JSON.parse(await readFile(resultsPath, "utf8")) as PlaywrightJson;
@@ -259,5 +262,6 @@ export async function uploadPlaywrightRun(
     id: manifest.run.id,
     url: new URL(manifest.url, options.serverUrl).toString(),
     artifacts: files.length,
+    tests: { passed: meta.passed, failed: meta.failed, skipped: meta.skipped },
   };
 }

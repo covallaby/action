@@ -55,7 +55,7 @@ on:
 permissions:
   contents: read
   pull-requests: write # sticky comment
-  statuses: write # covallaby/project + covallaby/patch checks
+  statuses: write # per-signal checks: covallaby/project, patch, journeys, components
   checks: write # the "Covallaby" Checks-tab entry
 
 jobs:
@@ -74,9 +74,11 @@ That's the whole setup. Every PR then gets:
 
 - **One sticky comment** — updated in place on every push, never spamming the
   thread, with collapsed per-file and per-directory breakdowns.
-- **Named checks** — `covallaby/patch — 96.8% (target 85.0%)` and
-  `covallaby/project` in the checks list, individually requirable in branch
-  protection.
+- **Named checks** — one per signal: `covallaby/patch — 96.8% (target 85.0%)`
+  and `covallaby/project` always, plus `covallaby/journeys` (Playwright
+  outcome) and `covallaby/components` (visual review state) when a server is
+  configured — each individually requirable in branch protection, each
+  deep-linking to its page on your Covallaby dashboard.
 - **A "Covallaby" entry in the Checks tab** — the full report as its own page.
 - **Diff annotations** — warning boxes directly on untested changed lines in
   the Files-changed view.
@@ -194,7 +196,7 @@ Multiple files merge automatically (test shards, mixed suites):
 | `strip-prefix` | Path prefix stripped so paths are repo-relative. | workspace |
 | `check` | The rich "Covallaby" Checks-tab entry. | `true` |
 | `annotations` | Warnings on uncovered changed lines in the diff. | `true` |
-| `statuses` | `covallaby/project` + `covallaby/patch` commit statuses. | `true` |
+| `statuses` | Per-signal commit statuses (`covallaby/project`, `covallaby/patch`, `covallaby/journeys`, `covallaby/components`), each deep-linked to its dashboard page. | `true` |
 | `github-token` | Token for comments/checks/statuses. | `github.token` |
 | `server-url` | Covallaby server used for hosted coverage, browser runs, and Storybook previews. | off |
 | `server-token` | Per-repo or admin upload token for that server. When both server inputs are set, coverage files are stored in the hosted dashboard. | off |

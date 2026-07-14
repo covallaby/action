@@ -29,6 +29,8 @@ export interface CommentInput {
   result: CheckResult;
   /** Directory-rollup depth: "auto" (default), a number, or "off". */
   breakdown?: number | "auto" | "off";
+  /** Dashboard page for this commit's coverage upload — deep-links the numbers. */
+  coverage?: { url: string };
   playback?: { url: string; artifacts: number };
   storybook?: { url: string; files: number; captures?: number };
 }
@@ -57,12 +59,16 @@ export function renderComment(input: CommentInput, maxRows: number = COMMENT_ROW
   const { summary, patch, thresholds, result } = input;
   const lines: string[] = [COMMENT_MARKER, "", "## 🦘 Covallaby", "", headline(input), ""];
 
+  // When the report lives on a Covallaby server, the numbers link straight
+  // to the commit's coverage page — the same target as the commit statuses.
+  const linked = (text: string) => (input.coverage ? `[${text}](${input.coverage.url})` : text);
+
   if (summary.totalFiles > 0) {
     lines.push("| Metric | Result |");
     lines.push("|---|---|");
-    lines.push(`| Project coverage | ${formatPercent(summary.lines.percent)} |`);
+    lines.push(`| Project coverage | ${linked(formatPercent(summary.lines.percent))} |`);
     if (patch && patch.lines.percent !== null) {
-      lines.push(`| Patch coverage | ${formatPercent(patch.lines.percent)} |`);
+      lines.push(`| Patch coverage | ${linked(formatPercent(patch.lines.percent))} |`);
     }
     const required: string[] = [];
     if (thresholds.minProject !== undefined) {
@@ -95,7 +101,7 @@ export function renderComment(input: CommentInput, maxRows: number = COMMENT_ROW
     );
     lines.push("");
     for (const file of spots.slice(0, 10)) {
-      lines.push(`- \`${codePath(file.path)}:${formatRanges(file.uncovered)}\``);
+      lines.push(`- ${linked(`\`${codePath(file.path)}:${formatRanges(file.uncovered)}\``)}`);
     }
     if (spots.length > 10) lines.push(`- …and ${spots.length - 10} more files`);
     lines.push("");

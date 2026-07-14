@@ -55,9 +55,14 @@ async function filesUnder(path: string, root: string): Promise<string[]> {
   ).flat();
 }
 
-export async function uploadStorybookPreview(
-  options: StorybookUploadOptions,
-): Promise<{ id: number; url: string; files: number; captures: number; captureSkipped?: string }> {
+export async function uploadStorybookPreview(options: StorybookUploadOptions): Promise<{
+  id: number;
+  url: string;
+  files: number;
+  captures: number;
+  reviewState: string;
+  captureSkipped?: string;
+}> {
   const fetcher = options.fetch ?? globalThis.fetch;
   const root = await realpath(resolve(options.directory));
   const capture = options.captures
@@ -101,7 +106,7 @@ export async function uploadStorybookPreview(
     );
   }
   const manifest = (await created.json()) as {
-    run: { id: number };
+    run: { id: number; reviewState?: string };
     artifacts: Array<{ path: string; uploadUrl: string }>;
     url: string;
   };
@@ -157,6 +162,8 @@ export async function uploadStorybookPreview(
     url: new URL(manifest.url, options.serverUrl).toString(),
     files: files.length,
     captures: capture.captures.length,
+    // Default-branch builds come back auto-accepted; PR builds start pending.
+    reviewState: manifest.run.reviewState ?? "pending",
     ...(capture.skipped && { captureSkipped: capture.skipped }),
   };
 }

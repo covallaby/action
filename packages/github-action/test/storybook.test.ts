@@ -56,6 +56,7 @@ describe("Storybook preview upload", () => {
       url: "https://app.example/r/acme/app/storybook-previews/8",
       files: 30,
       captures: 0,
+      reviewState: "pending",
     });
     expect(
       calls.find((call) => call.url.includes("objects.example"))?.authorization,

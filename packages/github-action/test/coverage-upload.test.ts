@@ -15,7 +15,9 @@ describe("uploadCoverageFiles", () => {
     await writeFile(second, "TN:web\n");
     const fetch = vi
       .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      .mockImplementation(async () =>
+        Response.json({ ok: true, id: 12, url: "/r/acme/app/u/12" }, { status: 200 }),
+      );
     vi.stubGlobal("fetch", fetch);
 
     await expect(
@@ -28,7 +30,7 @@ describe("uploadCoverageFiles", () => {
         commit: "abc123",
         pr: 42,
       }),
-    ).resolves.toBe(2);
+    ).resolves.toEqual({ uploaded: 2, url: "https://app.covallaby.com/r/acme/app/u/12" });
 
     const firstUrl = new URL(fetch.mock.calls[0]![0] as URL);
     const secondUrl = new URL(fetch.mock.calls[1]![0] as URL);
