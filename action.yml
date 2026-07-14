@@ -44,7 +44,7 @@ inputs:
     required: false
     default: "true"
   statuses:
-    description: "Create covallaby/project and covallaby/patch commit statuses (needs the `statuses: write` permission). Default true."
+    description: "Create per-signal commit statuses — covallaby/project, covallaby/patch, covallaby/journeys, covallaby/components — each deep-linking to its dashboard page (needs the `statuses: write` permission). Default true."
     required: false
     default: "true"
   github-token:

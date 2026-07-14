@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const uploadCoverageFiles = vi.hoisted(() => vi.fn().mockResolvedValue(2));
+const uploadCoverageFiles = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ uploaded: 2, url: "https://app.covallaby.com/r/acme/web/u/12" }),
+);
 const uploadStorybookPreview = vi.hoisted(() =>
   vi.fn().mockResolvedValue({
     id: 9,
     url: "https://app.covallaby.com/r/acme/web/storybook-previews/9",
     files: 3,
     captures: 1,
+    reviewState: "pending",
   }),
 );
 const cleanup = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -30,6 +33,8 @@ const inputs: Record<string, string> = {};
 const addRaw = vi.fn();
 const write = vi.fn();
 const createComment = vi.fn();
+const createCommitStatus = vi.fn();
+const createCheck = vi.fn();
 const publishServerComment = vi.hoisted(() => vi.fn().mockResolvedValue(false));
 
 vi.mock("@actions/core", () => ({
@@ -55,8 +60,8 @@ vi.mock("@actions/github", () => ({
     rest: {
       issues: { listComments: vi.fn(), updateComment: vi.fn(), createComment },
       pulls: { listFiles: vi.fn() },
-      checks: { create: vi.fn() },
-      repos: { createCommitStatus: vi.fn() },
+      checks: { create: createCheck },
+      repos: { createCommitStatus },
     },
   })),
 }));
@@ -65,6 +70,7 @@ vi.mock("../src/playwright.js", () => ({
   uploadPlaywrightRun: vi.fn().mockResolvedValue({
     url: "https://app.covallaby.com/r/acme/web/test-runs/42",
     artifacts: 7,
+    tests: { passed: 6, failed: 0, skipped: 1 },
   }),
 }));
 
@@ -114,6 +120,42 @@ describe("run", () => {
     );
   });
 
+  it("posts a per-signal covallaby/journeys status deep-linked to the playback", async () => {
+    const { run } = await import("../src/main.js");
+
+    await run();
+
+    expect(createCommitStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sha: "abc123",
+        context: "covallaby/journeys",
+        state: "success",
+        description: "6 journeys passed (1 skipped)",
+        target_url: "https://app.covallaby.com/r/acme/web/test-runs/42",
+      }),
+    );
+    // No coverage was supplied, so no coverage statuses should appear.
+    const contexts = createCommitStatus.mock.calls.map((call) => call[0].context);
+    expect(contexts).toEqual(["covallaby/journeys"]);
+  });
+
+  it("posts a pending covallaby/components status awaiting visual review", async () => {
+    inputs["playwright-results"] = "";
+    inputs["playwright-artifacts"] = "";
+    inputs["component-captures"] = ".lostpixel/current";
+    const { run } = await import("../src/main.js");
+
+    await run();
+
+    expect(createCommitStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: "covallaby/components",
+        state: "pending",
+        target_url: "https://app.covallaby.com/r/acme/web/storybook-previews/9",
+      }),
+    );
+  });
+
   it("publishes coverage files to the configured hosted server", async () => {
     Object.assign(inputs, {
       files: "packages/parsers/fixtures/lcov/basic.info, packages/parsers/fixtures/lcov/basic.info",
@@ -143,6 +185,22 @@ describe("run", () => {
       pr: 42,
     });
     expect(core.info).toHaveBeenCalledWith("Uploaded 2 coverage files to Covallaby.");
+    // The rich check and the coverage statuses deep-link to the hosted report.
+    expect(createCheck).toHaveBeenCalledWith(
+      expect.objectContaining({ details_url: "https://app.covallaby.com/r/acme/web/u/12" }),
+    );
+    expect(createCommitStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: "covallaby/project",
+        target_url: "https://app.covallaby.com/r/acme/web/u/12",
+      }),
+    );
+    // …and so does the sticky comment's coverage number.
+    expect(createComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("(https://app.covallaby.com/r/acme/web/u/12)"),
+      }),
+    );
   });
 
   it("does not post with GITHUB_TOKEN when the server owns the comment", async () => {

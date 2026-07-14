@@ -141,6 +141,7 @@ describe("Playwright playback upload", () => {
       id: 42,
       url: "https://app.example/r/acme/app/test-runs/42",
       artifacts: 6,
+      tests: { passed: 1, failed: 0, skipped: 0 },
     });
     const objectPuts = calls.filter((c) => c.url.startsWith("https://objects.example/"));
     expect(objectPuts).toHaveLength(6);
