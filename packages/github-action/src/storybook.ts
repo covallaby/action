@@ -15,6 +15,8 @@ export interface StorybookUploadOptions {
   fetch?: typeof globalThis.fetch;
   captureMode?: "auto" | "required" | "off";
   captures?: StoryCapture[];
+  /** Test seam for upload backoff; production uses exponential delays. */
+  retryDelay?: (milliseconds: number) => Promise<void>;
 }
 
 const MIME: Record<string, string> = {
@@ -35,6 +37,10 @@ const MIME: Record<string, string> = {
   ".woff": "font/woff",
   ".woff2": "font/woff2",
 };
+
+const RETRYABLE_UPLOAD_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+const sleep = (milliseconds: number) =>
+  new Promise<void>((resolveSleep) => setTimeout(resolveSleep, milliseconds));
 
 const isWithin = (path: string, root: string): boolean => {
   const fromRoot = relative(root, path);
@@ -120,9 +126,13 @@ export async function uploadStorybookPreview(options: StorybookUploadOptions): P
     throw new Error("Covallaby returned duplicate Storybook upload paths.");
   }
   const serverOrigin = new URL(options.serverUrl).origin;
-  for (let start = 0; start < files.length; start += 8) {
+  // Object stores can throttle short bursts even when every URL is valid.
+  // Keep the batch deliberately small and retry only transient responses;
+  // each attempt gets a fresh file stream because fetch consumes the body.
+  const retryDelay = options.retryDelay ?? sleep;
+  for (let start = 0; start < files.length; start += 3) {
     await Promise.all(
-      files.slice(start, start + 8).map(async (file) => {
+      files.slice(start, start + 3).map(async (file) => {
         const target = artifactsByPath.get(file.relativePath);
         if (!target) {
           throw new Error(
@@ -130,20 +140,26 @@ export async function uploadStorybookPreview(options: StorybookUploadOptions): P
           );
         }
         const targetUrl = new URL(target.uploadUrl, `${options.serverUrl}/`);
-        const uploaded = await fetcher(targetUrl.toString(), {
-          method: "PUT",
-          headers: {
-            "content-type": file.contentType,
-            "content-length": String(file.sizeBytes),
-            ...(targetUrl.origin === serverOrigin ? auth : {}),
-          },
-          body: createReadStream(file.path) as never,
-          duplex: "half",
-        } as RequestInit);
-        if (!uploaded.ok) {
-          throw new Error(
-            `Uploading Storybook file ${file.relativePath} failed (${uploaded.status}): ${await uploaded.text()}`,
-          );
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const uploaded = await fetcher(targetUrl.toString(), {
+            method: "PUT",
+            headers: {
+              "content-type": file.contentType,
+              "content-length": String(file.sizeBytes),
+              ...(targetUrl.origin === serverOrigin ? auth : {}),
+            },
+            body: createReadStream(file.path) as never,
+            duplex: "half",
+          } as RequestInit);
+          if (uploaded.ok) break;
+          const failure = await uploaded.text();
+          const retry = RETRYABLE_UPLOAD_STATUS.has(uploaded.status) && attempt < 4;
+          if (!retry) {
+            throw new Error(
+              `Uploading Storybook file ${file.relativePath} failed (${uploaded.status}): ${failure}`,
+            );
+          }
+          await retryDelay(1000 * 2 ** attempt);
         }
       }),
     );

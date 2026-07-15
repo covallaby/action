@@ -96,6 +96,7 @@ describe("Storybook preview upload", () => {
       commit: "abc",
       pr: null,
       captureMode: "off" as const,
+      retryDelay: async () => {},
     };
     await expect(
       uploadStorybookPreview({
@@ -144,5 +145,47 @@ describe("Storybook preview upload", () => {
         },
       }),
     ).rejects.toThrow("Completing Covallaby Storybook preview failed (409)");
+  });
+
+  it("retries throttled object uploads with a fresh request", async () => {
+    const root = await mkdtemp(join(tmpdir(), "covallaby-storybook-"));
+    await writeFile(join(root, "index.html"), "<h1>Storybook</h1>");
+    let uploads = 0;
+    const delays: number[] = [];
+    const result = await uploadStorybookPreview({
+      serverUrl: "https://app.example",
+      token: "secret",
+      directory: root,
+      repo: "acme/app",
+      branch: "main",
+      commit: "abc",
+      pr: null,
+      captureMode: "off",
+      retryDelay: async (milliseconds) => {
+        delays.push(milliseconds);
+      },
+      fetch: async (input) => {
+        const url = String(input);
+        if (url.endsWith("/api/v1/storybook-previews")) {
+          return Response.json(
+            {
+              run: { id: 9, reviewState: "auto-accepted" },
+              artifacts: [{ path: "index.html", uploadUrl: "https://objects.example/index.html" }],
+              url: "/r/acme/app/storybook-previews/9",
+            },
+            { status: 201 },
+          );
+        }
+        if (url.endsWith("/complete")) return new Response(null, { status: 200 });
+        uploads += 1;
+        return uploads < 3
+          ? new Response("SlowDown", { status: 503 })
+          : new Response(null, { status: 200 });
+      },
+    });
+
+    expect(uploads).toBe(3);
+    expect(delays).toEqual([1000, 2000]);
+    expect(result.reviewState).toBe("auto-accepted");
   });
 });
