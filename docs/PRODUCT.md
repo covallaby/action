@@ -17,3 +17,8 @@ Primary deliverables:
 Tagline:
 
 Beautiful coverage reports for your pull requests.
+
+## Demo note
+
+Docs-only changes have no coverable lines, so Covallaby's patch gate
+passes them without demanding tests for prose.
